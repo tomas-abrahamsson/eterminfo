@@ -10,7 +10,7 @@ Features of eterminfo
 
 Example usage
 -------------
-
+```
   > {ok,D} = eterminfo:setup_by_infocmp("vt100", [long_names]).
 
   > dict:fetch(terminfo_id, D).
@@ -49,27 +49,20 @@ Example usage
   %%    (according to the terminfo man page)
   > F(3, 12, []).
   [27,91,52,59,49,51,72,{pad,{5,false,false}}]
- 
+```
 
 
 Version numbering
 -----------------
 
-The gpb version number is fetched from the git latest git tag
+The version number is fetched from the git latest git tag
 matching N.M where N and M are integers.  This version is
-inserted into the gpb.app file as well as into the
-include/gpb_version.hrl.  The version is the result of the command
+inserted into the eterminfo.app file.
+The version is the result of the command
 
   git describe --always --tags --match '[0-9]*.[0-9]*'
 
-Thus, so create a new version of gpb, the single source from where
-this version is fetched, is the git tag.   (If you are importing
-gpb into another version control system than git, or using another
-build tool than rebar, you might have to adapt rebar.config and
-src/gpb.app.src accordingly.)
-
 Places to update when making a new version:
-* Write about the changes in the ChangeLog file
 * tag it in git
 
 
