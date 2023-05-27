@@ -29,10 +29,38 @@
 -export([tigetnum/2]).
 -export([tigetstr/2]).
 
+-export_type([term_name/0, terminfo/0]).
+-export_type([infocmp_opts/0, infocmp_opt/0]).
+
 %%--------------------------------------------------------------------
 %% Include files
 %%--------------------------------------------------------------------
 -include_lib("kernel/include/file.hrl").
+
+-type term_name() :: string().
+-type terminfo() :: #{terminfo_id := terminfo_id(),
+                      cap_name() => cap(),
+                      literal_key(cap_name()) => string()}.
+
+-type terminfo_id() :: [string()].
+-type cap_name() :: string().
+-type cap() :: out_seq() % string capabilities
+             | integer() % numeric capabilities
+             | boolean() % boolean capabilities
+             | fun((...) -> out_seq()) % parameterized capabilities
+               .
+-type literal_key(ForX) :: {literal, ForX}.
+-type out_seq() :: [char() | pad()].
+-type pad() :: {pad, #{delay := non_neg_integer(), % milliseconds
+                       proportional := boolean(),
+                       mandatory := boolean()}}.
+
+-type bool_opt(Opt) :: Opt | {Opt, boolean()}.
+
+-type infocmp_opts() :: [infocmp_opt() | _IgnoredOpt::term()].
+-type infocmp_opt() :: bool_opt(terminfo_names)
+                     | bool_opt(long_names).
+
 
 %%====================================================================
 %% External functions
@@ -41,9 +69,12 @@
 %% Function: start_link/0
 %% Description: Starts the server
 %%--------------------------------------------------------------------
+-spec setup_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType) ->
     setup_by_infocmp(TermType, _Opts=[]).
 
+-spec setup_by_infocmp(term_name(), infocmp_opts()) ->
+          {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType, Opts) ->
     ProgOpts = case {proplists:get_bool(terminfo_names, Opts),
                      proplists:get_bool(long_names, Opts)} of
@@ -111,6 +142,8 @@ collect_stdout(Port, Acc) ->
 %%
 %% Keys are capability names (Capnames in the termcap(5) man page).
 %%
+-spec tparm(terminfo(), cap_name()) -> out_seq().
+
 tparm(M, Str) -> (maps:get(Str, M))(#{}).
 tparm(M, Str, A) -> (maps:get(Str, M))(A,#{}).
 tparm(M, Str, A,B) -> (maps:get(Str, M))(A,B,#{}).

@@ -153,11 +153,16 @@ get_pnums([_ | R]) ->
 get_pnums([]) ->
     [].
 
+-type elem() :: char()
+              | string()
+              | pad().
+-type pad() :: {pad, map()}.
+
 -record(env,
-        {st,    % list()        % stack
-         ps,    % dict()        % params
-         dvs,   % dict()        % dynamic vars
-         svs    % dict()        % static vars
+        {st :: [elem()],             % stack
+         ps :: #{1..9 => elem()},    % params. Keys are integers 1..9
+         dvs :: #{[char()] => elem()}, % dynamic vars. Keys are "A".."Z"
+         svs :: #{[char()] => elem()}  % static vars. Keys are "A".."Z"
         }).
 
 eval_ptree(Params0, StatVars, PTree) ->
