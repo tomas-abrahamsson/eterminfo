@@ -59,7 +59,7 @@ setup_by_infocmp(TermType, Opts) ->
             case run_infocmp(Program, ProgOpts ++ [TermType]) of
                 {ok, TermInfoStr} ->
                     case eterminfo_infocmp_parser:string(TermInfoStr) of
-                        {ok, _TermInfoDict} = Result ->
+                        {ok, _TermInfoM} = Result ->
                             Result;
                         {error, Reason} ->
                             {error, {infocmp_parse_error,Reason,TermInfoStr}}
@@ -107,42 +107,40 @@ collect_stdout(Port, Acc) ->
     end.
 
 
-%% API for parsed dictionary
+%% API for parsed map
 %%
 %% Keys are capability names (Capnames in the termcap(5) man page).
 %%
-tparm(TDict, Str) -> (dict:fetch(Str, TDict))([]).
-tparm(TDict, Str, A) -> (dict:fetch(Str, TDict))(A,[]).
-tparm(TDict, Str, A,B) -> (dict:fetch(Str, TDict))(A,B,[]).
-tparm(TDict, Str, A,B,C) -> (dict:fetch(Str, TDict))(A,B,C,[]).
-tparm(TDict, Str, A,B,C,D) -> (dict:fetch(Str, TDict))(A,B,C,D,[]).
-tparm(TDict, Str, A,B,C,D,E) -> (dict:fetch(Str, TDict))(A,B,C,D,E,[]).
-tparm(TDict, Str, A,B,C,D,E,F) -> (dict:fetch(Str, TDict))(A,B,C,D,E,F,[]).
-tparm(TDict, Str, A,B,C,D,E,F,G) -> (dict:fetch(Str, TDict))(A,B,C,D,E,F,G,[]).
-tparm(TDict, Str, A,B,C,D,E,F,G,H) ->
-    (dict:fetch(Str, TDict))(A,B,C,D,E,F,G,H,[]).
-tparm(TDict, Str, A,B,C,D,E,F,G,H,I) ->
-    (dict:fetch(Str, TDict))(A,B,C,D,E,F,G,H,I,[]).
+tparm(M, Str) -> (maps:get(Str, M))(#{}).
+tparm(M, Str, A) -> (maps:get(Str, M))(A,#{}).
+tparm(M, Str, A,B) -> (maps:get(Str, M))(A,B,#{}).
+tparm(M, Str, A,B,C) -> (maps:get(Str, M))(A,B,C,#{}).
+tparm(M, Str, A,B,C,D) -> (maps:get(Str, M))(A,B,C,D,#{}).
+tparm(M, Str, A,B,C,D,E) -> (maps:get(Str, M))(A,B,C,D,E,#{}).
+tparm(M, Str, A,B,C,D,E,F) -> (maps:get(Str, M))(A,B,C,D,E,F,#{}).
+tparm(M, Str, A,B,C,D,E,F,G) -> (maps:get(Str, M))(A,B,C,D,E,F,G,#{}).
+tparm(M, Str, A,B,C,D,E,F,G,H) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,#{}).
+tparm(M, Str, A,B,C,D,E,F,G,H,I) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,I,#{}).
 
-tigetflag(TDict, Str) ->
-    case dict:find(Str, TDict) of
+tigetflag(M, Str) ->
+    case maps:find(Str, M) of
         {ok, true}  -> true;
         {ok, false} -> false;
         {ok, _}     -> {error, {not_a_boolean_capability, Str}};
         error       -> false
     end.
 
-tigetnum(TDict, Str) ->
-    case dict:find(Str, TDict) of
+tigetnum(M, Str) ->
+    case maps:find(Str, M) of
         {ok, N} when is_integer(N) -> N;
         {ok, X}                    -> {error,{not_a_numeric_capability,Str,X}};
         error                      -> 0
     end.
 
-tigetstr(TDict, Str) ->
-    case dict:find(Str, TDict) of
+tigetstr(M, Str) ->
+    case maps:find(Str, M) of
         {ok, S} when is_list(S)     -> S;
-        {ok, F} when is_function(F) -> dict:fetch({literal,Str}, TDict);
+        {ok, F} when is_function(F) -> maps:get({literal,Str}, M);
         {ok, X}                     -> {error,{not_a_string_capability,Str,X}};
         error                       -> {error,{string_capability_not_found,Str}}
     end.

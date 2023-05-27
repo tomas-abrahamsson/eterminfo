@@ -160,30 +160,29 @@ get_pnums([]) ->
          svs    % dict()        % static vars
         }).
 
-eval_ptree(Params0, StaticKVPairs0, PTree) ->
-    {_, Params} = foldl(fun(V, {K, Ps}) -> {K+1, dict:store(K,V,Ps)} end,
-                        {1, dict:new()},
+eval_ptree(Params0, StatVars, PTree) ->
+    {_, Params} = foldl(fun(V, {K, Ps}) -> {K+1, Ps#{K => V}} end,
+                        {1, #{}},
                         tuple_to_list(Params0)),
-    DynVars = dict:new(),
-    StatVars = dict:from_list(StaticKVPairs0),
+    DynVars = #{},
     {_St, _Ps, _DVs, _SVs, Acc} =
         ep(PTree, _Stack = [], Params, DynVars, StatVars, _Acc = []),
     _Result = lists:flatten(lists:reverse(Acc)).
 
 ep([{push, {param, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case dict:find(N, Ps) of
-        {ok, V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        error   -> ep(Rest, St,       Ps, DVs, SVs, Acc)
+    case Ps of
+        #{N := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
+        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
     end;
 ep([{push, {dyn_var, K}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case dict:find(K, DVs) of
-        {ok, V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        error   -> ep(Rest, St,       Ps, DVs, SVs, Acc)
+    case DVs of
+        #{K := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
+        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
     end;
 ep([{push, {stat_var, K}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case dict:find(K, SVs) of
-        {ok, V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        error   -> ep(Rest, St,       Ps, DVs, SVs, Acc)
+    case SVs of
+        #{K := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
+        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
     end;
 ep([{push, {int, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
     ep(Rest, [N | St], Ps, DVs, SVs, Acc);
@@ -194,9 +193,9 @@ ep([{pop, as_string} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
 ep([{pop, {printf, FmtInfo}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
     ep(Rest, St, Ps, DVs, SVs, [printf_format(FmtInfo,V) | Acc]);
 ep([{pop, {dyn_var, K}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, dict:store(K, V, DVs), SVs, Acc);
+    ep(Rest, St, Ps, DVs#{K => V}, SVs, Acc);
 ep([{pop, {stat_var, K}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, dict:store(K, V, SVs), Acc);
+    ep(Rest, St, Ps, DVs, SVs#{K => V}, Acc);
 ep([strlen | Rest], [V | St], Ps, DVs, SVs, Acc) ->
     if is_integer(V) -> ep(Rest, [1 | St], Ps, DVs, SVs, Acc);
        is_list(V)    -> ep(Rest, [length(V) | St], Ps, DVs, SVs, Acc)
@@ -242,11 +241,9 @@ ep([S | Rest], St, Ps, DVs, SVs, Acc) ->
 ep([], St, Ps, DVs, SVs, Acc) ->
     {St, Ps, DVs, SVs, Acc}.
 
-incr_first_two_params(Ps0) ->
-    V1 = dict:fetch(1, Ps0),
-    V2 = dict:fetch(2, Ps0),
-    Ps1 = dict:store(1, V1+1, Ps0),
-    _Ps2= dict:store(2, V2+1, Ps1).
+incr_first_two_params(#{1 := V1, 2 := V2}=Ps) ->
+    Ps#{1 := V1+1,
+        2 := V2+1}.
 
 eval_if_then_else(Cond, Then, Else, St0, Ps0, DVs0, SVs0, Acc0) ->
     case ep(Cond, St0, Ps0, DVs0, SVs0, Acc0) of

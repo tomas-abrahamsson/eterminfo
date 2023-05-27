@@ -22,44 +22,45 @@
 
 
 vt100_long_test() ->
-    {ok, D} = parse_terminfo_str("vt100", vt100_long_lines()),
-    ["vt100","vt100-am","dec vt100 "++_] = dict:fetch(terminfo_id, D),
+    {ok, M} = parse_terminfo_str("vt100", vt100_long_lines()),
+    #{terminfo_id := ["vt100","vt100-am","dec vt100 "++_]} = M,
     %% Numeric capability
-    8 = dict:fetch("init_tabs", D), %% tabs initially every # spaces
+    #{"init_tabs" := 8} = M, %% tabs initially every # spaces
     %% String capabilities
-    "\r" = dict:fetch("carriage_return", D),
-    [7]  = dict:fetch("bell", D),
+    #{"carriage_return" := "\r",
+      "bell" := [7]} = M,
     %% Variable string capabilities
-    StaticVars = [], %% any vars referenced with %g[A-Z] or %P[A-Z]
-    CUU = dict:fetch("parm_up_cursor", D),
+    StaticVars = #{}, %% any vars referenced with %g[A-Z] or %P[A-Z]
+    #{"parm_up_cursor"   := CUU,
+      "parm_down_cursor" := CUD} = M,
     "\e[1A" = CUU(1, StaticVars),
-    CUD = dict:fetch("parm_down_cursor", D),
     "\e[1B" = CUD(1, StaticVars),
     ok.
 
 vt100_short_test() ->
-    {ok, D} = parse_terminfo_str("vt100", vt100_short_lines()),
-    ["vt100","vt100-am","dec vt100 "++_] = dict:fetch(terminfo_id, D),
+    {ok, M} = parse_terminfo_str("vt100", vt100_short_lines()),
+    #{terminfo_id := ["vt100","vt100-am","dec vt100 "++_]} = M,
     %% Numeric capability
-    8 = dict:fetch("it", D), %% tabs initially every # spaces
+    #{"it" := 8} = M, %% tabs initially every # spaces
     %% String capabilities
-    "\r" = dict:fetch("cr", D),
-    [7]  = dict:fetch("bel", D),
+    #{"cr" := "\r",
+      "bel" := [7]} = M,
     %% Variable string capabilities
-    StaticVars = [], %% any vars referenced with %g[A-Z] or %P[A-Z]
-    CUU = dict:fetch("cuu", D), %% cursor up a parameterized number of lines
+    StaticVars = #{}, %% any vars referenced with %g[A-Z] or %P[A-Z]
+    #{"cuu" := CUU, %% cursor up a parameterized number of lines
+      "cud" := CUD  %% cursor down a parameterized number of lines
+     } = M,
     "\e[1A" = CUU(1, StaticVars),
-    CUD = dict:fetch("cud", D), %% cursor down a parameterized number of lines
     "\e[1B" = CUD(1, StaticVars),
     ok.
 
 bool_capability_test() ->
-    {ok, D} = parse_terminfo_str(["\tx,"]),
+    {ok, M} = parse_terminfo_str(["\tx,"]),
     %% fetch boolean capability "x"
-    true = dict:fetch("x", D).
+    #{"x" := true} = M.
 
 string_capability_test() ->
-    {ok, D} = parse_terminfo_str(["\ts=abc,",
+    {ok, M} = parse_terminfo_str(["\ts=abc,",
                                   "\tescapes=\\e\\E,", %% escape, in two forms
                                   "\tnewline=\\n,"
                                   "\tlinefeed=\\l,",
@@ -75,26 +76,30 @@ string_capability_test() ->
                                   "\tcolon=\\:,",
                                   "\tnul=\\0,"
                                  ]),
-    "abc" = dict:fetch("s", D),
-    "\e\e" = dict:fetch("escapes", D),
-    [7] = dict:fetch("ctrlchar", D),
-    "\r\n" = dict:fetch("newline", D),
-    "\n" = dict:fetch("linefeed", D),
-    "\r" = dict:fetch("return", D),
-    "\b" = dict:fetch("backspace", D),
-    "\f" = dict:fetch("formfeed", D),
-    " "  = dict:fetch("space", D),
-    "^"  = dict:fetch("circumflex", D),
-    "\\" = dict:fetch("backslash", D),
-    ","  = dict:fetch("comma", D),
-    ":"  = dict:fetch("colon", D),
-    [128] = dict:fetch("nul", D),
+    #{"s"          := "abc",
+      "escapes"    := "\e\e",
+      "ctrlchar"   := [7],
+      "newline"    := "\r\n",
+      "linefeed"   := "\n",
+      "return"     := "\r",
+      "backspace"  := "\b",
+      "formfeed"   := "\f",
+      "space"      := " ",
+      "circumflex" := "^",
+      "backslash"  := "\\",
+      "comma"      := ",",
+      "colon"      := ":",
+      "nul"        := [128]
+     } = M,
     ok.
 
 delay_capability_test() ->
     %% $<5> means delay 5 milliseconds
-    {ok, D} = parse_terminfo_str(["\ts=\eK$<5>,"]),
-    [27,75,{pad,{5,false,false}}] = dict:fetch("s", D). %% fixme is this ok?
+    {ok, M} = parse_terminfo_str(["\ts=\eK$<5>,"]),
+    %% fixme is this ok?
+    #{"s" := [27,75,{pad,#{delay        := 5,
+                           proportional := false,
+                           mandatory    := false}}]} = M.
 
 %% Various parameterized string tests
 %%
@@ -105,11 +110,11 @@ delay_capability_test() ->
 %% in the terminfo(5) man page. (at least, that's the case on Linux)
 
 paramstr_percent_test() ->
-    {ok, D} = parse_terminfo_str(["\tpercent=%%,"]),
-    "%" = dict:fetch("percent", D).
+    {ok, M} = parse_terminfo_str(["\tpercent=%%,"]),
+    #{"percent" := "%"} = M.
 
 paramstr_simple_push_pop_test() ->
-    {ok, D} = parse_terminfo_str([%% push param(s), pop and printf with %d
+    {ok, M} = parse_terminfo_str([%% push param(s), pop and printf with %d
                                   "\tpushpop1=%p1%d,",
                                   "\tpushpop2=%p1%p2%d%d,",
                                   %% %s for string formatting
@@ -121,20 +126,20 @@ paramstr_simple_push_pop_test() ->
                                   %% pushing a number
                                   "\tpushnum=%{65}%d,"
                                  ]),
-    PP1  = dict:fetch("pushpop1", D),
+    #{"pushpop1" := PP1,
+      "pushpop2" := PP2,
+      "popstr"   := PS,
+      "popchar"  := PC,
+      "pushchar" := PX,
+      "pushnum"  := PN} = M,
     "1"  = PP1(1, []),
     "2"  = PP1(2, []),
-    PP2  = dict:fetch("pushpop2", D),
     "21" = PP2(1,2, []),
     "12" = PP2(2,1, []),
-    PS   = dict:fetch("popstr", D),
     "ab" = PS("ab", []),
     ""   = PS("", []),
-    PC   = dict:fetch("popchar", D),
     "a"  = PC($a, []),
-    PX   = dict:fetch("pushchar", D),
     "x"  = PX([]),
-    PN   = dict:fetch("pushnum", D),
     "65" = PN([]),
     ok.
 
@@ -142,7 +147,7 @@ paramstr_str_formatting_test() ->
     %% %[[:]flags][width[.precision]][doxXs]
     %% where flags are [-+#] and space
     %% the : with flag=- avoids interpreting %- as an op
-    {ok, D} = parse_terminfo_str(["\trightw2=>%p1%2d<,",
+    {ok, M} = parse_terminfo_str(["\trightw2=>%p1%2d<,",
                                   "\tleftw2=>%p1%:-2d<,",
                                   "\thexleft1w4=>%p1%:-4x<,",
                                   "\thexleft2w4=>%p1%#4x<,",
@@ -154,139 +159,145 @@ paramstr_str_formatting_test() ->
                                   "\tstrleftw4=>%p1%:-4s<,",
                                   ""
                                  ]),
-    D1         = dict:fetch("rightw2", D),
+    #{"rightw2"     := D1,
+      "leftw2"      := D2,
+      "hexleft1w4"  := X11,
+      "hexleft2w4"  := X12,
+      "hexleft3w6"  := X13,
+      "uhexleft1w4" := X21,
+      "uhexleft2w4" := X22,
+      "uhexleft3w6" := X23,
+      "octleftw4"   := O1,
+      "strleftw4"   := S1} = M,
     "> 2<"     = D1(2, []),
-    D2         = dict:fetch("leftw2", D),
     ">2 <"     = D2(2, []),
-    X11        = dict:fetch("hexleft1w4", D),
     ">c0  <"   = X11(192, []),
-    X12        = dict:fetch("hexleft2w4", D),
     ">0xc0<"   = X12(192, []),
-    X13        = dict:fetch("hexleft3w6", D),
     ">0xc0  <" = X13(192, []),
-    X21        = dict:fetch("uhexleft1w4", D),
     ">C0  <"   = X21(192, []),
-    X22        = dict:fetch("uhexleft2w4", D),
     ">0XC0<"   = X22(192, []),
-    X23        = dict:fetch("uhexleft3w6", D),
     ">0XC0  <" = X23(192, []),
-    O1         = dict:fetch("octleftw4", D),
     ">377 <"   = O1(255, []),
-    S1         = dict:fetch("strleftw4", D),
     ">abc <"   = S1("abc", []),
     ok.
 
 paramstr_dyn_var_test() ->
-    {ok, D} = parse_terminfo_str([%% push param 1, (%p1)
+    {ok, M} = parse_terminfo_str([%% push param 1, (%p1)
                                   %% pop into a dynamic var a, (%Pa)
                                   %% get that dynamic var and push it (%ga)
                                   %% pop and printf it (%d)
                                   %% get+push and pop+printf it again
                                   "\tdynvar=%p1%Pa%ga%d%ga%d,"]),
-    PP2 = dict:fetch("dynvar", D),
+    #{"dynvar" := PP2} = M,
     "22" = PP2(2, []).
 
 paramstr_static_var_test() ->
-    {ok, D} = parse_terminfo_str(
+    {ok, M} = parse_terminfo_str(
                 [%% same as dyn var, but with a static var
                  %% (uppercase A means static var instead
                  %% of dynamic)
                  "\tdynstaticvar=%p1%Pa%p2%PA%gA%d-%ga%d-%gC%d,"]),
-    PP3 = dict:fetch("dynstaticvar", D),
-    "3-4-5" = PP3(4, 3, [{"C", 5}]).
+    #{"dynstaticvar" := PP3} = M,
+    "3-4-5" = PP3(4, 3, #{"C" => 5}).
 
 paramstr_strlen_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tstrlen=%p1%l%d,"]),
-    L = dict:fetch("strlen", D),
+    {ok, M} = parse_terminfo_str(["\tstrlen=%p1%l%d,"]),
+    #{"strlen" := L} = M,
     "6" = L("abcdef", []),
     "7" = L("abcdefg", []).
 
 paramstr_bin_arith_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tadd=%p1%p2%+%d,",
+    {ok, M} = parse_terminfo_str(["\tadd=%p1%p2%+%d,",
                                   "\tsub=%p1%p2%-%d,",
                                   "\tmul=%p1%p2%*%d,",
                                   "\tdiv=%p1%p2%/%d,",
                                   "\tmod=%p1%p2%m%d,"]),
     %% arithmetic operations
-    AAdd = dict:fetch("add", D),
+    #{"add" := AAdd,
+      "sub" := ASub,
+      "mul" := AMul,
+      "div" := ADiv,
+      "mod" := AMod} = M,
     "3"  = AAdd(1, 2, []),
-    ASub = dict:fetch("sub", D),
     "4"  = ASub(6, 2, []),
-    AMul = dict:fetch("mul", D),
     "12" = AMul(6, 2, []),
-    ADiv = dict:fetch("div", D),
     "4" = ADiv(8, 2, []),
-    AMod = dict:fetch("mod", D),
     "1" = AMod(13, 3, []).
 
 paramstr_arith_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tadd=%p1%p2%+%d,",
+    {ok, M} = parse_terminfo_str(["\tadd=%p1%p2%+%d,",
                                   "\tsub=%p1%p2%-%d,",
                                   "\tmul=%p1%p2%*%d,",
                                   "\tdiv=%p1%p2%/%d,",
                                   "\tmod=%p1%p2%m%d,",
                                   "\tinc=%i%p1%d%p2%d,"]),
-    AAdd = dict:fetch("add", D),
+    #{"add" := AAdd,
+      "sub" := ASub,
+      "mul" := AMul,
+      "div" := ADiv,
+      "mod" := AMod,
+      "inc" := AInc} = M,
     "3"  = AAdd(1, 2, []),
-    ASub = dict:fetch("sub", D),
     "4"  = ASub(6, 2, []),
-    AMul = dict:fetch("mul", D),
     "12" = AMul(6, 2, []),
-    ADiv = dict:fetch("div", D),
     "4"  = ADiv(8, 2, []),
-    AMod = dict:fetch("mod", D),
     "1"  = AMod(13, 3, []),
-    AInc = dict:fetch("inc", D),
     "95" = AInc(8, 4, []).
 
 paramstr_bit_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tand=%p1%p2%&%d,",
+    {ok, M} = parse_terminfo_str(["\tand=%p1%p2%&%d,",
                                   "\tor=%p1%p2%|%d,",
                                   "\txor=%p1%p2%^%d,",
                                   "\tnot=%p1%~%d,"]),
-    BAnd = dict:fetch("and", D),
+    #{"and" := BAnd,
+      "or"  := BOr,
+      "xor" := BXor,
+      "not" := BNot} = M,
     "1"  = BAnd(1, 3, []),
-    BOr  = dict:fetch("or", D),
     "7"  = BOr(6, 3, []),
-    BXor = dict:fetch("xor", D),
     "5"  = BXor(6, 3, []),
-    BNot = dict:fetch("not", D),
     "-7" = BNot(6, []). %% FIXME: is this correct?
 
 paramstr_logical_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tand=%p1%p2%A%d,",
+    {ok, M} = parse_terminfo_str(["\tand=%p1%p2%A%d,",
                                   "\tor=%p1%p2%O%d,",
                                   "\tnot=%p1%!%d,"]),
-    LAnd = dict:fetch("and", D),
+    #{"and" := LAnd,
+      "or"  := LOr,
+      "not" := LNot} = M,
+
     "0"  = LAnd(1, 0, []),
     "1"  = LAnd(1, 3, []),
-    LOr  = dict:fetch("or", D),
+
     "0"  = LOr(0, 0, []),
     "1"  = LOr(1, 0, []),
     "1"  = LOr(0, 7, []),
-    LNot = dict:fetch("not", D),
+
     "1"  = LNot(0, []),
     "0"  = LNot(1, []).
 
 paramstr_cmp_op_test() ->
-    {ok, D} = parse_terminfo_str(["\tlt=%p1%p2%<%d,",
+    {ok, M} = parse_terminfo_str(["\tlt=%p1%p2%<%d,",
                                   "\tgt=%p1%p2%>%d,",
                                   "\teq=%p1%p2%=%d,"]),
-    LT   = dict:fetch("lt", D),
+    #{"lt" := LT,
+      "gt" := GT,
+      "eq" := EQ} = M,
+
     "1"  = LT(2, 3, []),
     "0"  = LT(2, 2, []),
     "0"  = LT(2, 1, []),
-    GT   = dict:fetch("gt", D),
+
     "0"  = GT(2, 3, []),
     "0"  = GT(2, 2, []),
     "1"  = GT(2, 1, []),
-    EQ   = dict:fetch("eq", D),
+
     "1"  = EQ(0, 0, []),
     "1"  = EQ(1, 1, []),
     "0"  = EQ(2, 3, []).
 
 paramstr_if_then_else_test() ->
-    {ok, D} = parse_terminfo_str(
+    {ok, M} = parse_terminfo_str(
                 [%% if-then:
                  %% push p1 (%p1)
                  %% push 3  (%{3})
@@ -298,13 +309,18 @@ paramstr_if_then_else_test() ->
                  "\tifte=%?%p1%{3}%=%tt%ee%;,"
                  %% if-then-else-if-then-else
                  "\telsif=%?%p1%{3}%>%!%tt1%e%p1%{8}%<%tt2%ee%;,"]),
-    IFT = dict:fetch("ift", D), %% if-then
+
+    #{"ift" := IFT,     % if-then
+      "ifte" := IFTE,   % if-then-else
+      "elsif" := ElsIf  % if-then-elsif-else
+     } = M,
+
     "t" = IFT(3, []),
     ""  = IFT(4, []),
-    IFTE = dict:fetch("ifte", D), %% if-then-else
+
     "t"  = IFTE(3, []),
     "e"  = IFTE(4, []),
-    ElsIf = dict:fetch("elsif", D), %% if-then-elsif-else
+
     "t1"  = ElsIf(2, []),
     "t2"  = ElsIf(7, []),
     "e"   = ElsIf(9, []),

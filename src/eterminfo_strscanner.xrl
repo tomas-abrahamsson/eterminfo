@@ -136,7 +136,9 @@ extr_padding("$<"++Rest) ->
     N = list_to_integer(NStr),
     Proportional = lists:member($*, Rest2),
     Mandatory = lists:member($/, Rest2),
-    {N, Proportional, Mandatory}.
+    #{delay        => N,
+      proportional => Proportional,
+      mandatory    => Mandatory}.
 
 extr_padding_n(Str) -> extr_p_n(Str, _Acc = "").
 extr_p_n([C | Rest], Acc) when C >= $0, C =< $9 -> extr_p_n(Rest, [C | Acc]);

@@ -23,18 +23,18 @@
 -import(lists, [flatten/1, reverse/1]).
 
 string(S) ->
-    Dict = dict:new(),
+    M = #{},
     ParseFun = mk_parser_fun(),
-    parse(S++[eof], ParseFun, Dict).
+    parse(S++[eof], ParseFun, M).
 
-parse(S, ParseFun, Dict) ->
+parse(S, ParseFun, M) ->
     case ParseFun(S) of
         {ok, {Key, Value}, ParseFun1} ->
-            parse("", ParseFun1, dict:store(Key, Value, Dict));
+            parse("", ParseFun1, M#{Key => Value});
         {error, _Reason} = Error->
             Error;
         done ->
-            {ok, Dict};
+            {ok, M};
         {more, ParseFun1} ->
             {more, ParseFun1}
     end.

@@ -11,33 +11,40 @@ Features of eterminfo
 Example usage
 -------------
 ```
-  > {ok,D} = eterminfo:setup_by_infocmp("vt100", [long_names]).
+  > {ok,M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
+  #{...}
 
-  > dict:fetch(terminfo_id, D).
+  > maps:get(terminfo_id, M).
   ["vt100","vt100-am","dec vt100 (w/advanced video)"]p
 
   %% Reading a bool capability
-  > dict:fetch("xon_xoff", D).
+  > maps:get("xon_xoff", M).
   true
 
   %% Reading a numeric capability: tabs are initially 8 spaces wide
-  > dict:fetch("init_tabs", D),
+  > maps:get("init_tabs", M),
   8
 
   %% Reading a string capability: what string to send to produce a beep
-  > dict:fetch("bell", D),
+  > maps:get("bell", M),
   [7]
 
   %% Reading parameterized strings:
+  %% We use the "parm_down_cursor" as an example. This moves the cursor down
+  %% a number of lines.
+  %% The second parameter is a map of static vars on the form  #{"A" => 10}
+  %% The static parameter defaults to #{} in the eterminfo:tparm functions.
+  %% The number of parameters varies dependending on capability. See
+  %% terminfo(5) for further information.
+  > F = maps:get("parm_down_cursor", M).
+  > F(2, #{}).
+  "\e[2B"      % \e means: escape, ascii 27
+  > eterminfo:tparm(M, "parm_down_cursor", 2).
+  "\e[2B"
 
-  %% Move the cursor down a number of lines
-  > Dn = dict:fetch("parm_down_cursor", D).
-  #Fun<eterminfo_strparser.2.61294760>
-  > Dn(2, []).
-  "\e[2B"   %% \e means: escape, ascii 27
-
-  %% Addressing the cursor
-  > F = dict:fetch("cursor_address", D).
+  %% String parameters can also contain padding---delays in milliseconds,
+  %% for example when addressing the cursor.
+  > Fc = maps:get("cursor_address", M).
   #Fun<eterminfo_strparser.5.61294760>
   %% The {pad,{5,false,false}} below means:
   %%  - 5 milliseconds delay is needed
@@ -47,8 +54,9 @@ Example usage
   %%  - Second boolean: whether or not padding is mandatory,
   %%    also with xon/xoff flow control
   %%    (according to the terminfo man page)
-  > F(3, 12, []).
-  [27,91,52,59,49,51,72,{pad,{5,false,false}}]
+  > Fc(3, 12, #{}).
+  [27,91,52,59,49,51,72,
+   {pad,#{delay => 5,mandatory => false,proportional => false}}]
 ```
 
 
