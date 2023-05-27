@@ -3,3 +3,6 @@
 /src/eterminfo_strscanner.erl
 /.eunit/*
 /doc/*
+/ebin/eterminfo.app
+/.eterminfo-*.plt
+erl_crash.dump
