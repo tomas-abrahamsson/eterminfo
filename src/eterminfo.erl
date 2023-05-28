@@ -22,7 +22,23 @@
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
+-export([install_by_infocmp/0, install_by_infocmp/1]).
+
+-export([tparm/1, tparm/2, tparm/3, tparm/4, tparm/5]).
+-export([tparm/6, tparm/7, tparm/8, tparm/9, tparm/10]).
+-export([tigetflag/1]).
+-export([tigetnum/1]).
+-export([tigetstr/1]).
+
+%% Lower-level contituents api:
+
 -export([setup_by_infocmp/1, setup_by_infocmp/2]).
+-export([install_terminfo/2]).
+-export([is_terminfo_installed/0, is_terminfo_installed/1]).
+-export([get_installed_terminfo/0, get_installed_terminfo/1]).
+-export([get_term_type/0]).
+-export([get_term_type_or_default/0, get_term_type_or_default/1]).
+
 -export([tparm_m/2, tparm_m/3, tparm_m/4, tparm_m/5, tparm_m/6]).
 -export([tparm_m/7, tparm_m/8, tparm_m/9, tparm_m/10, tparm_m/11]).
 -export([tigetflag_m/2]).
@@ -62,6 +78,116 @@
                      | bool_opt(long_names).
 
 
+%% @equiv install_by_infocmp(#{})
+install_by_infocmp() ->
+    install_by_infocmp(#{}).
+
+%%--------------------------------------------------------------------
+%% @doc Read a terminfo definition using the `infocmp' program and
+%%      install it. By default, it will try to find terminfo for `$TERM'
+%% with long names.
+%%
+%% The {@link tparm/1}..{@link tparm/10}, {@link tigetflag/1}, {@link
+%% tigetnum/1} and {@link tigetstr/1} functions use the installed
+%% term for the current terminal type.
+%%
+%% Invoking this function will more than once for a particular
+%% terminal type will cause it to overwrite the persistent term,
+%% which will trigger a system-wide garbage collection in the Erlang vm.
+%% It is intended to be invoked only once initially.
+%% @end
+%% --------------------------------------------------------------------
+install_by_infocmp(Spec) ->
+    TermType = maps:get(term, Spec, get_term_type_or_default()),
+    LongNamesOpts = case maps:get(long_names, Spec, true) of
+                        true -> [long_names];
+                        false -> []
+                    end,
+    case setup_by_infocmp(TermType, LongNamesOpts) of
+        {ok, TermInfo} ->
+            install_terminfo(TermType, TermInfo),
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Retrieve the current terminal type.
+%% Example:
+%% ```
+%%   1> eterminfo:get_term_type().
+%%   "vt100"
+%% '''
+%% @end
+%%--------------------------------------------------------------------
+get_term_type() ->
+    case os:getenv("TERM") of
+        false -> error(no_TERM);
+        Term  -> Term
+    end.
+
+%% @equiv get_term_type_or_default("ansi")
+get_term_type_or_default() ->
+    get_term_type_or_default("ansi").
+
+%%--------------------------------------------------------------------
+%% @doc Retrieve the current terminal type, or a default.
+%% Example:
+%% ```
+%%   1> eterminfo:get_term_type("ansi").
+%%   "vt100"
+%%   2> os:unsetenv("TERM").
+%%   3> eterminfo:get_term_type("ansi").
+%%   "ansi"
+%% '''
+%% @end
+%%--------------------------------------------------------------------
+get_term_type_or_default(Default) ->
+    case os:getenv("TERM") of
+        false -> Default;
+        Term  -> Term
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc For a particular terminal type, install a terminfo as a
+%% persistent term.
+%% @end
+%%--------------------------------------------------------------------
+install_terminfo(TermType, TermInfo) ->
+    persistent_term:put({?MODULE, TermType}, TermInfo).
+
+
+%% @equiv get_term_type_or_default(get_term_type_or_default())
+is_terminfo_installed() ->
+    is_terminfo_installed(get_term_type_or_default()).
+
+%%--------------------------------------------------------------------
+%% @doc Check if a terminal type is installed.
+%% Example:
+%% ```
+%%   1> eterminfo:is_terminfo_installed().
+%%   false
+%%   2> eterminfo:install_by_infocmp().
+%%   ok
+%%   3> eterminfo:is_terminfo_installed().
+%%   true
+%% '''
+%% @end
+%%--------------------------------------------------------------------
+is_terminfo_installed(TermType) ->
+    try persistent_term:get({?MODULE, TermType}) of
+        _ -> true
+    catch error:badarg ->
+            false
+    end.
+
+get_installed_terminfo() ->
+    get_installed_terminfo(get_term_type_or_default()).
+
+get_installed_terminfo(TermType) ->
+    persistent_term:get({?MODULE, TermType}).
+
+
 %% @equiv setup_by_infocmp(TermType, [])
 -spec setup_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType) ->
@@ -86,7 +212,7 @@ setup_by_infocmp(TermType) ->
 %%
 %% Example:
 %% ```
-%%   1> {ok, M} = setup_by_infocmp("vt100", [long_names]).
+%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
 %%   {ok,#{"key_right" => "\eOC",
 %%         "enter_am_mode" => "\e[?7h",
 %%         "carriage_return" => "\r",
@@ -170,6 +296,38 @@ collect_stdout(Port, Acc) ->
 %%
 %% Keys are capability names (Capnames in the termcap(5) man page).
 %%
+
+tparm(Str) ->
+    tparm_m(get_installed_terminfo(), Str).
+tparm(Str, A) ->
+    tparm_m(get_installed_terminfo(), Str, A).
+tparm(Str, A,B) ->
+    tparm_m(get_installed_terminfo(), Str, A,B).
+tparm(Str, A,B,C) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C).
+tparm(Str, A,B,C,D) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D).
+tparm(Str, A,B,C,D,E) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E).
+tparm(Str, A,B,C,D,E,F) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F).
+tparm(Str, A,B,C,D,E,F,G) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G).
+tparm(Str, A,B,C,D,E,F,G,H) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G,H).
+tparm(Str, A,B,C,D,E,F,G,H,I) ->
+    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G,H,I).
+
+tigetflag(Str) ->
+    tigetflag_m(get_installed_terminfo(), Str).
+
+tigetnum(Str) ->
+    tigetnum_m(get_installed_terminfo(), Str).
+
+tigetstr(Str) ->
+    tigetstr_m(get_installed_terminfo(), Str).
+
+
 -spec tparm_m(terminfo(), cap_name()) -> out_seq().
 
 tparm_m(M, Str) -> (maps:get(Str, M))(#{}).

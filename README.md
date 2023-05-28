@@ -11,54 +11,54 @@ Features of eterminfo
 Example usage
 -------------
 ```
-  > {ok,M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
-  #{...}
-
-  > maps:get(terminfo_id, M).
-  ["vt100","vt100-am","dec vt100 (w/advanced video)"]p
-
-  %% Reading a bool capability
-  > maps:get("xon_xoff", M).
-  true
-
-  %% Reading a numeric capability: tabs are initially 8 spaces wide
-  > maps:get("init_tabs", M),
-  8
+  > ok = eterminfo:get_term_type().
+  "vt100"
+  > eterminfo:install_by_infocmp().
+  ok
 
   %% Reading a string capability: what string to send to produce a beep
-  > maps:get("bell", M),
+  > eterminfo:tigetstr("bell").
   [7]
 
-  %% Reading parameterized strings:
-  %% We use the "parm_down_cursor" as an example. This moves the cursor down
-  %% a number of lines.
-  %% The second parameter is a map of static vars on the form  #{"A" => 10}
-  %% The static parameter defaults to #{} in the eterminfo:tparm functions.
-  %% The number of parameters varies dependending on capability. See
-  %% terminfo(5) for further information.
-  > F = maps:get("parm_down_cursor", M).
-  > F(2, #{}).
-  "\e[2B"      % \e means: escape, ascii 27
-  > eterminfo:tparm(M, "parm_down_cursor", 2).
-  "\e[2B"
+  %% Reading a numeric capability: tabs are initially 8 spaces wide
+  > eterminfo:tigetnum("init_tabs").
+  8
 
-  %% String parameters can also contain padding---delays in milliseconds,
-  %% for example when addressing the cursor.
-  > Fc = maps:get("cursor_address", M).
-  #Fun<eterminfo_strparser.5.61294760>
-  %% The {pad,{5,false,false}} below means:
-  %%  - 5 milliseconds delay is needed
-  %%  - First boolean: whether or not padding is not proportional
-  %%    to the number of lines affected by the operation (according
-  %%    to the terminfo man page)
-  %%  - Second boolean: whether or not padding is mandatory,
-  %%    also with xon/xoff flow control
-  %%    (according to the terminfo man page)
-  > Fc(3, 12, #{}).
-  [27,91,52,59,49,51,72,
+  %% Reading a bool capability
+  > eterminfo:tigetflag("xon_xoff").
+  true
+
+  %% Getting a parameterized capability.
+  %% The parm_down_cursor capability takes one parameter, number of lines.
+  > eterminfo:tparm("parm_down_cursor", 10).
+  "\e[10B"
+
+  %% Reading the name of the terminfo.
+  > eterminfo:tigetstr(terminfo_id).
+  ["vt100","vt100-am","DEC VT100 (w/advanced video)"]
+
+  %% Capability string can have padding---delays in milliseconds---at some places.
+  %% If the padding may be proportional to the number of lines.
+  %% See terminfo(5) for more info.
+  > eterminfo:tparm("cursor_address", 10, 10).
+  [27,91,49,49,59,49,49,72,
    {pad,#{delay => 5,mandatory => false,proportional => false}}]
-```
 
+  %% Reading all installed capabilities as a map.
+  %% For each parametersized capability, there is also a
+  %% `{literal,Capability}` entry.
+  > eterminfo:get_installed_terminfo().
+  #{"key_right" => "\eOC",
+    "enter_am_mode" => "\e[?7h","carriage_return" => "\r",
+    "exit_standout_mode" =>
+        [27,91,109,
+         {pad,#{delay => 2,mandatory => false,proportional => false}}],
+    "key_left" => "\eOD",
+    "parm_left_cursor" => #Fun<eterminfo_strparser.8.19824310>,
+    ...
+    {literal,"parm_left_cursor"} => "\\E[%p1%dD"",
+    ...}
+```
 
 Version numbering
 -----------------
