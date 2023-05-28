@@ -157,9 +157,11 @@ read_key([C | Rest], Acc) ->
 
 
 read_number(S) ->
-    case catch read_number2(S) of
-        N when is_integer(N) -> {ok, N};
-        Crash                -> {error, Crash}
+    try read_number2(S) of
+        N when is_integer(N) ->
+            {ok, N}
+    catch Class:Reason:Stack ->
+            {error, {Class, Reason, Stack}}
     end.
 
 read_number2("0x" ++ Rest) -> read_hex(Rest);
