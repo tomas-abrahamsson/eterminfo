@@ -131,8 +131,8 @@ parse_terminfo_string(S) ->
                         {ok, Value}   -> {ok, Key, Value, Rest};
                         {error, Info} -> {error, {parse_error, Key,Rest, Info}}
                     end;
-                {error, Info} ->
-                    {error, {scan_error, Key,Rest, Info}}
+                {error, Info, _EndLine} ->
+                    {error, {scan_error, Key, Rest, Info}}
             end;
         cancelled_key ->
             cancelled_key;
