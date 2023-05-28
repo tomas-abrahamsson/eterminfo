@@ -23,11 +23,11 @@
 %% API
 %%--------------------------------------------------------------------
 -export([setup_by_infocmp/1, setup_by_infocmp/2]).
--export([tparm/2, tparm/3, tparm/4, tparm/5, tparm/6]).
--export([tparm/7, tparm/8, tparm/9, tparm/10, tparm/11]).
--export([tigetflag/2]).
--export([tigetnum/2]).
--export([tigetstr/2]).
+-export([tparm_m/2, tparm_m/3, tparm_m/4, tparm_m/5, tparm_m/6]).
+-export([tparm_m/7, tparm_m/8, tparm_m/9, tparm_m/10, tparm_m/11]).
+-export([tigetflag_m/2]).
+-export([tigetnum_m/2]).
+-export([tigetstr_m/2]).
 
 -export_type([term_name/0, terminfo/0]).
 -export_type([infocmp_opts/0, infocmp_opt/0]).
@@ -170,20 +170,20 @@ collect_stdout(Port, Acc) ->
 %%
 %% Keys are capability names (Capnames in the termcap(5) man page).
 %%
--spec tparm(terminfo(), cap_name()) -> out_seq().
+-spec tparm_m(terminfo(), cap_name()) -> out_seq().
 
-tparm(M, Str) -> (maps:get(Str, M))(#{}).
-tparm(M, Str, A) -> (maps:get(Str, M))(A,#{}).
-tparm(M, Str, A,B) -> (maps:get(Str, M))(A,B,#{}).
-tparm(M, Str, A,B,C) -> (maps:get(Str, M))(A,B,C,#{}).
-tparm(M, Str, A,B,C,D) -> (maps:get(Str, M))(A,B,C,D,#{}).
-tparm(M, Str, A,B,C,D,E) -> (maps:get(Str, M))(A,B,C,D,E,#{}).
-tparm(M, Str, A,B,C,D,E,F) -> (maps:get(Str, M))(A,B,C,D,E,F,#{}).
-tparm(M, Str, A,B,C,D,E,F,G) -> (maps:get(Str, M))(A,B,C,D,E,F,G,#{}).
-tparm(M, Str, A,B,C,D,E,F,G,H) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,#{}).
-tparm(M, Str, A,B,C,D,E,F,G,H,I) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,I,#{}).
+tparm_m(M, Str) -> (maps:get(Str, M))(#{}).
+tparm_m(M, Str, A) -> (maps:get(Str, M))(A,#{}).
+tparm_m(M, Str, A,B) -> (maps:get(Str, M))(A,B,#{}).
+tparm_m(M, Str, A,B,C) -> (maps:get(Str, M))(A,B,C,#{}).
+tparm_m(M, Str, A,B,C,D) -> (maps:get(Str, M))(A,B,C,D,#{}).
+tparm_m(M, Str, A,B,C,D,E) -> (maps:get(Str, M))(A,B,C,D,E,#{}).
+tparm_m(M, Str, A,B,C,D,E,F) -> (maps:get(Str, M))(A,B,C,D,E,F,#{}).
+tparm_m(M, Str, A,B,C,D,E,F,G) -> (maps:get(Str, M))(A,B,C,D,E,F,G,#{}).
+tparm_m(M, Str, A,B,C,D,E,F,G,H) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,#{}).
+tparm_m(M, Str, A,B,C,D,E,F,G,H,I) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,I,#{}).
 
-tigetflag(M, Str) ->
+tigetflag_m(M, Str) ->
     case maps:find(Str, M) of
         {ok, true}  -> true;
         {ok, false} -> false;
@@ -191,14 +191,14 @@ tigetflag(M, Str) ->
         error       -> false
     end.
 
-tigetnum(M, Str) ->
+tigetnum_m(M, Str) ->
     case maps:find(Str, M) of
         {ok, N} when is_integer(N) -> N;
         {ok, X}                    -> {error,{not_a_numeric_capability,Str,X}};
         error                      -> 0
     end.
 
-tigetstr(M, Str) ->
+tigetstr_m(M, Str) ->
     case maps:find(Str, M) of
         {ok, S} when is_list(S)     -> S;
         {ok, F} when is_function(F) -> maps:get({literal,Str}, M);
