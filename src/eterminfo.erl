@@ -17,6 +17,42 @@
 %%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 %%% MA  02110-1301  USA
 
+%%--------------------------------------------------------------------
+%% @doc
+%% This program can acquire terminfo capabilities. The capabilities
+%% are represented as a map of entries for various types of capabilities:
+%%
+%% <dl>
+%%   <dt>string capabilities</dt>
+%%   <dd>A sequence of characters as integers (a string),
+%%       or `{pad,Info}' elements.</dd>
+%%   <dt>numerical capabilities</dt>
+%%   <dd>An integer</dd>
+%%   <dt>boolean capabilities</dt>
+%%   <dd>`true' or `false'</dd>
+%%   <dt>parameterized capabilities</dt>
+%%   <dd>A function, that takes as last parameter a map of static variables.
+%%   </dd>
+%% </dl>
+%%
+%% Example:
+%% ```
+%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
+%%   {ok,#{"key_right" => "\eOC",
+%%         "enter_am_mode" => "\e[?7h",
+%%         "carriage_return" => "\r",
+%%         "exit_standout_mode" =>
+%%             [27,91,109,
+%%              {pad,#{delay => 2,mandatory => false,proportional => false}}],
+%%         "parm_left_cursor" => #Fun<...>,
+%%         ...}}
+%%   2> #{"parm_left_cursor" := Left} = M.
+%%   3> Left(10, #{}).
+%%   "\e[10D"
+%% '''
+%% @end
+%%--------------------------------------------------------------------
+
 -module(eterminfo).
 
 %%--------------------------------------------------------------------
@@ -196,35 +232,6 @@ setup_by_infocmp(TermType) ->
 %%--------------------------------------------------------------------
 %% @doc Use the `infocmp' program to read terminal info by terminal name.
 %% Return a map with capability entries.
-%%
-%% <dl>
-%%   <dt>string capabilities</dt>
-%%   <dd>A sequence of characters as integers (a string),
-%%       or `{pad,Info}' elements.</dd>
-%%   <dt>numerical capabilities</dt>
-%%   <dd>An integer</dd>
-%%   <dt>boolean capabilities</dt>
-%%   <dd>`true' or `false'</dd>
-%%   <dt>parameterized capabilities</dt>
-%%   <dd>A function, that takes as last parameter a map of static variables.
-%%   </dd>
-%% </dl>
-%%
-%% Example:
-%% ```
-%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
-%%   {ok,#{"key_right" => "\eOC",
-%%         "enter_am_mode" => "\e[?7h",
-%%         "carriage_return" => "\r",
-%%         "exit_standout_mode" =>
-%%             [27,91,109,
-%%              {pad,#{delay => 2,mandatory => false,proportional => false}}],
-%%         "parm_left_cursor" => #Fun<...>,
-%%         ...}}
-%%   2> #{"parm_left_cursor" := Left} = M.
-%%   3> Left(10, #{}).
-%%   "\e[10D"
-%% '''
 %% @end
 %%--------------------------------------------------------------------
 -spec setup_by_infocmp(term_name(), infocmp_opts()) ->
