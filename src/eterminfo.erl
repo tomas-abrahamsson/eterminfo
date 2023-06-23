@@ -92,7 +92,7 @@
 -type term_name() :: string().
 -type terminfo() :: #{'$terminfo_names' := terminfo_names(),
                       cap_name() => cap(),
-                      literal_key(cap_name()) => string()}.
+                      '$str_literals' => #{cap_name => string()}}.
 
 -type terminfo_names() :: [string()].
 -type cap_name() :: atom().
@@ -101,7 +101,6 @@
              | boolean() % boolean capabilities
              | fun((...) -> out_seq()) % parameterized capabilities
                .
--type literal_key(ForX) :: {literal, ForX}.
 -type out_seq() :: [char() | pad()].
 -type pad() :: {pad, #{delay := non_neg_integer(), % milliseconds
                        proportional := boolean(),
@@ -367,9 +366,10 @@ tigetnum_m(M, CapName) ->
     end.
 
 tigetstr_m(M, CapName) ->
-    case maps:find(CapName, M) of
-        {ok, S} when is_list(S)     -> S;
-        {ok, F} when is_function(F) -> maps:get({literal,CapName}, M);
-        {ok, X} -> {error,{not_a_string_capability,CapName,X}};
-        error   -> {error,{string_capability_not_found,CapName}}
+    case M of
+        #{CapName := S} when is_list(S) -> S;
+        #{CapName := F,
+          '$str_literals' := #{CapName := S}} when is_function(F) -> S;
+        #{CapName := X} -> {error,{not_a_string_capability,CapName,X}};
+        _               -> {error,{string_capability_not_found,CapName}}
     end.

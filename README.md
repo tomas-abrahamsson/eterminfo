@@ -45,8 +45,8 @@ Example usage
    {pad,#{delay => 5,mandatory => false,proportional => false}}]
 
   %% Reading all installed capabilities as a map.
-  %% For each parametersized capability, there is also a
-  %% `{literal,Capability}` entry.
+  %% For each parametersized capability, the string representatino is also
+  %% present in the '$str_literals' map
   > eterminfo:get_installed_terminfo().
   #{key_right => "\eOC",
     enter_am_mode => "\e[?7h","carriage_return" => "\r",
@@ -56,7 +56,7 @@ Example usage
     key_left => "\eOD",
     parm_left_cursor => #Fun<...>,
     ...
-    {literal,parm_left_cursor} => "\\E[%p1%dD"",
+    '$str_literals' => #{..., parm_left_cursor => "\\E[%p1%dD"", ...},
     ...}
 ```
 

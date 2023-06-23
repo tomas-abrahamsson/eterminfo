@@ -29,8 +29,17 @@ string(S) ->
 
 parse(S, ParseFun, M) ->
     case ParseFun(S) of
-        {ok, {Key, Value}, ParseFun1} ->
+        {ok, {Key, Value}, ParseFun1} when is_atom(Key) ->
             parse("", ParseFun1, M#{Key => Value});
+        {ok, {{literal, Key}, Value}, ParseFun1} ->
+            case M of
+                #{'$str_literals' := Lits} ->
+                    M1 = M#{'$str_literals' := Lits#{Key => Value}},
+                    parse("", ParseFun1, M1);
+                #{} ->
+                    M1 = M#{'$str_literals' => #{Key => Value}},
+                    parse("", ParseFun1, M1)
+            end;
         {error, _Reason} = Error->
             Error;
         done ->
