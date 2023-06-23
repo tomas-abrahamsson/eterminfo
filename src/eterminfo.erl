@@ -58,6 +58,7 @@
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
+-export([install_by_file/0, install_by_file/1]).
 -export([install_by_infocmp/0, install_by_infocmp/1]).
 
 -export([tparm/1, tparm/2, tparm/3, tparm/4, tparm/5]).
@@ -69,6 +70,7 @@
 
 %% Lower-level contituents api:
 
+-export([setup_by_file/1, setup_by_file/2]).
 -export([setup_by_infocmp/1, setup_by_infocmp/2]).
 -export([install_terminfo/2]).
 -export([is_terminfo_installed/0, is_terminfo_installed/1]).
@@ -83,6 +85,7 @@
 -export([tputs_m/2]).
 
 -export_type([term_name/0, terminfo/0]).
+-export_type([file_opts/0]).
 -export_type([infocmp_opts/0]).
 
 %%--------------------------------------------------------------------
@@ -112,6 +115,17 @@
 -define(name_format_opt_assocs,
         cap_names => cap_name_format()).
 
+
+-define(file_opt_assocs,
+        ?name_format_opt_assocs).
+
+-type file_opts() :: #{?file_opt_assocs,
+                       _ => _}.
+
+-type file_install() :: #{term => term_name(),
+                          ?file_opt_assocs,
+                          _ => _}.
+
 -define(infocmp_opt_assocs,
         ?name_format_opt_assocs).
 
@@ -130,6 +144,27 @@
                          cap_names := cap_name_format()}.
 
 -define(is_char(C), is_integer(C)).
+
+%% @equiv install_by_file(#{})
+install_by_file() ->
+    install_by_file(#{}).
+
+%%--------------------------------------------------------------------
+%% @doc Lodate a terminfo definition file and install it.
+%%      By default, it will try to find terminfo for `$TERM'
+%%      with long names.
+%% @end
+%%--------------------------------------------------------------------
+-spec install_by_file(file_install()) -> ok | {error, term()}.
+install_by_file(Spec) ->
+    TermType = get_term_type(Spec),
+    case setup_by_file(TermType, Spec) of
+        {ok, TermInfo} ->
+            install_terminfo(Spec, TermInfo),
+            ok;
+        {error, Reason} ->
+            {error, Reason}
+    end.
 
 %% @equiv install_by_infocmp(#{})
 install_by_infocmp() ->
@@ -276,6 +311,35 @@ get_cap_name_format(Opts) ->
     end.
 %%- - - - - - - - - - - -
 
+
+%% @equiv setup_by_file(TermType, #{})
+-spec setup_by_file(term_name()) -> {ok, terminfo()} | {error, term()}.
+setup_by_file(TermType) ->
+    setup_by_file(TermType, #{}).
+
+%%--------------------------------------------------------------------
+%% @doc Locate a terminfo file and read it.
+%% Return a map with capability entries.
+%% @end.
+%%--------------------------------------------------------------------
+-spec setup_by_file(term_name(), file_opts()) ->
+          {ok, terminfo()} | {error, term()}.
+setup_by_file(TermType, Opts) ->
+    %% Currently handles only terminfo files
+    %% Handle termcap too?
+    %% Handle hashed database too? (bdb format)
+
+    case eterminfo_bin:find_terminfo(TermType, Opts) of
+        {ok, Bin} when is_binary(Bin) ->
+            case eterminfo_bin:decode_terminfo(Bin) of
+                {ok, _TermInfo} = Result ->
+                    Result;
+                {error, Reason} ->
+                    {error, {file_parse_error, Reason, Bin}}
+            end;
+        {error, Reason} ->
+            {error, {terminfo_file_not_found, Reason}}
+    end.
 
 %% @equiv setup_by_infocmp(TermType, #{})
 -spec setup_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.

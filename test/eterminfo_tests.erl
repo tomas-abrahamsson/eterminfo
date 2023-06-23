@@ -326,6 +326,42 @@ paramstr_if_then_else_test() ->
     "e"   = ElsIf(9, []),
     ok.
 
+file_non_extended_test() ->
+    %% From the example in the term(5) man page
+    {ok, M} = parse_terminfo_file_from_hexdump(
+                "adm3a",
+                <<"1a 01 10 00 02 00 03 00  82 00 31 00 61 64 6d 33
+                   61 7c 6c 73 69 20 61 64  6d 33 61 00 00 01 50 00
+                   ff ff 18 00 ff ff 00 00  02 00 ff ff ff ff 04 00
+                   ff ff ff ff ff ff ff ff  0a 00 25 00 27 00 ff ff
+                   29 00 ff ff ff ff 2b 00  ff ff 2d 00 ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+                   ff ff ff ff ff ff 2f 00  07 00 0d 00 1a 24 3c 31
+                   3e 00 1b 3d 25 70 31 25  7b 33 32 7d 25 2b 25 63
+                   25 70 32 25 7b 33 32 7d  25 2b 25 63 00 0a 00 1e
+                   00 08 00 0c 00 0b 00 0a  00">>),
+    #{am := true,
+      cols := 80, lines := 24,
+      bel := [7], clear := [8#32, {pad, #{delay := 1,
+                                          mandatory := false,
+                                          proportional := false}}],
+      cr := [13], cub1 := [8], cud1 := [10], cuf1 := [12],
+      cup := CupF, cuu1 := [11], home := [30], ind := [10]} = M,
+    "\e" ++ _ = CupF(1, 1, #{}),
+    ok.
+
 parse_terminfo_str(CapabilityLines) ->
     parse_terminfo_str("dummy", ["#\tComment",
                                  "tname|some altname with spaces,"
@@ -341,6 +377,17 @@ ensure_ends_with_newline(S) ->
         $\n -> S;
         _   -> S ++ "\n"
     end.
+
+parse_terminfo_file_from_hexdump(TermName, HexDump) ->
+    Bin = <<<<(list_to_integer([C], 16)):4>>
+            || <<C>> <= iolist_to_binary(HexDump),
+               is_hex_digit(C)>>,
+    eterminfo:setup_by_file(TermName, #{terminfo_bin => Bin}).
+
+is_hex_digit(D) when $0 =< D, D =< $9 -> true;
+is_hex_digit(D) when $A =< D, D =< $F -> true;
+is_hex_digit(D) when $a =< D, D =< $f -> true;
+is_hex_digit(_) -> false.
 
 vt100_long_lines() ->
     ["#\tReconstructed via infocmp from file: /lib/terminfo/v/vt100",

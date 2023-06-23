@@ -1,0 +1,160 @@
+#! /usr/bin/env escript
+%%! -*- erlang -*-
+%%! +B -noinput -boot start_clean
+
+%%% Copyright (C) 2023  Tomas Abrahamsson
+%%%
+%%% Author: Tomas Abrahamsson <tab@lysator.liu.se>
+%%%
+%%% This library is free software; you can redistribute it and/or
+%%% modify it under the terms of the GNU Lesser General Public
+%%% License as published by the Free Software Foundation; either
+%%% version 2.1 of the License, or (at your option) any later version.
+%%%
+%%% This library is distributed in the hope that it will be useful,
+%%% but WITHOUT ANY WARRANTY; without even the implied warranty of
+%%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+%%% Lesser General Public License for more details.
+%%%
+%%% You should have received a copy of the GNU Lesser General Public
+%%% License along with this library; if not, write to the Free Software
+%%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+%%% MA  02110-1301  USA
+
+-mode(compile).
+
+main([CapsPath]) ->
+    {ok, B} = file:read_file(CapsPath),
+    Lines = string:split(B, "\n", all),
+    Entries = parse_lines([string:chomp(Line) || Line <- Lines]),
+    % io:format("~P~n", [Entries, 40]),
+    process(Entries),
+    ok.
+
+
+parse_lines([Line | Rest]) ->
+    case analyze_line(Line) of
+        entry ->
+            case parse_line(Line) of
+                {ok, Entry} -> [Entry | parse_lines(Rest)];
+                error -> parse_lines(Rest)
+            end;
+        stop_marker ->
+            [];
+        comment ->
+            parse_lines(Rest)
+    end.
+
+analyze_line(Line) ->
+    case is_comment(Line) of
+        true ->
+            case is_stop_marker(Line) of
+                true -> stop_marker;
+                false -> comment
+            end;
+        false ->
+            entry
+    end.
+
+is_stop_marker(Line) ->
+    string:find(Line, "%%-STOP-HERE-%%") /= nomatch.
+
+is_comment(<<"#", _/binary>>) -> true;
+is_comment(_) -> false.
+
+parse_line(Line) ->
+    case string:lexemes(Line, " \t") of
+        [TermInfoVar, TermInfoCap, Type, Termcap, _, _, _ | CommentWords] ->
+            {ok, #{terminfo_var_name => binary_to_atom(TermInfoVar),
+                   terminfo_cap_name => binary_to_atom(TermInfoCap),
+                   termcap_name      => binary_to_atom(Termcap),
+                   type => case Type of
+                               <<"bool">> -> boolean;
+                               <<"num">> -> numeric;
+                               <<"str">> -> string
+                           end,
+                   comment => unicode:characters_to_list(
+                                lists:join(" ", CommentWords))}};
+        _ ->
+            error
+    end.
+
+process(Entries) ->
+    io:format("-module(eterminfo_cap_names).~n"),
+    io:format("~n"),
+    io:format("-export([boolean_names/0]).~n"),
+    io:format("-export([numeric_names/0]).~n"),
+    io:format("-export([string_names/0]).~n"),
+    io:format("~n"),
+    io:format("boolean_names() ->~n"
+              "    %% Order matches term.h~n"
+              "    [~s"
+              "    ].~n",
+              [comma_join_with_comments(
+                 "     ",
+                 [{io_lib:format("{~p, ~p, ~p}",
+                                 [TermInfoVar, TermInfoCap, Termcap]),
+                   Comment}
+                  || #{terminfo_var_name := TermInfoVar,
+                       terminfo_cap_name := TermInfoCap,
+                       termcap_name      := Termcap,
+                       type := boolean,
+                       comment := Comment} <- Entries])]),
+    io:format("~n"),
+    io:format("numeric_names() ->~n"
+              "    %% Order matches term.h~n"
+              "    [~s"
+              "    ].~n",
+              [comma_join_with_comments(
+                 "     ",
+                 [{io_lib:format("{~p, ~p, ~p}",
+                                 [TermInfoVar, TermInfoCap, Termcap]),
+                   Comment}
+                  || #{terminfo_var_name := TermInfoVar,
+                       terminfo_cap_name := TermInfoCap,
+                       termcap_name      := Termcap,
+                       type := numeric,
+                       comment := Comment} <- Entries])]),
+    io:format("~n"),
+    io:format("string_names() ->~n"
+              "    %% Order matches term.h~n"
+              "    [~s"
+              "    ].~n",
+              [comma_join_with_comments(
+                 "     ",
+                 [{io_lib:format("{~p, ~p, ~p}",
+                                 [TermInfoVar, TermInfoCap, Termcap]),
+                   Comment}
+                  || #{terminfo_var_name := TermInfoVar,
+                       terminfo_cap_name := TermInfoCap,
+                       termcap_name      := Termcap,
+                       type := string,
+                       comment := Comment} <- Entries])]),
+    ok.
+
+
+comma_join_with_comments(Indent, [{Item, Comment}]) ->
+    CommentStr = if Comment == "" -> "";
+                    Comment /= "" -> [" % ", Comment]
+                 end,
+    Align = if Comment == "" -> "";
+               Comment /= "" ->
+                    spaces(45 - string:length(Item) - length(Indent) + 1)
+            end,
+    [Item, Align, CommentStr, "\n"];
+comma_join_with_comments(Indent, [{Item, Comment} | Rest]) ->
+    CommentStr = if Comment == "" -> "";
+                    Comment /= "" -> [" % ", Comment]
+                 end,
+    Align = if Comment == "" -> "";
+               Comment /= "" ->
+                    spaces(45 - string:length(Item) - length(Indent))
+            end,
+    [Item, ",", Align, CommentStr, "\n", Indent
+     | comma_join_with_comments(Indent, Rest)];
+comma_join_with_comments(_Indent, []) ->
+    "".
+
+spaces(N) when N >= 1 -> lists:duplicate(N, $\s);
+spaces(_) -> "".
+
