@@ -62,9 +62,9 @@
 
 -export([tparm/1, tparm/2, tparm/3, tparm/4, tparm/5]).
 -export([tparm/6, tparm/7, tparm/8, tparm/9, tparm/10]).
--export([tigetflag/1]).
--export([tigetnum/1]).
--export([tigetstr/1]).
+-export([tigetflag/1, tigetflag/2]).
+-export([tigetnum/1, tigetnum/2]).
+-export([tigetstr/1, tigetstr/2]).
 
 %% Lower-level contituents api:
 
@@ -75,8 +75,7 @@
 -export([get_term_type/0]).
 -export([get_term_type_or_default/0, get_term_type_or_default/1]).
 
--export([tparm_m/2, tparm_m/3, tparm_m/4, tparm_m/5, tparm_m/6]).
--export([tparm_m/7, tparm_m/8, tparm_m/9, tparm_m/10, tparm_m/11]).
+-export([tparm_m/3]).
 -export([tigetflag_m/2]).
 -export([tigetnum_m/2]).
 -export([tigetstr_m/2]).
@@ -352,51 +351,64 @@ collect_stdout(Port, Acc) ->
 %%
 
 tparm(CapName) ->
-    tparm_m(get_installed_terminfo(), CapName).
+    tparm_m(get_installed_terminfo(), CapName, []).
 tparm(CapName, A) ->
-    tparm_m(get_installed_terminfo(), CapName, A).
+    tparm_m(tp_get_installed_terminfo(A), CapName, [A]).
 tparm(CapName, A,B) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B).
+    tparm_m(tp_get_installed_terminfo(B), CapName, [A,B]).
 tparm(CapName, A,B,C) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C).
+    tparm_m(tp_get_installed_terminfo(C), CapName, [A,B,C]).
 tparm(CapName, A,B,C,D) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D).
+    tparm_m(tp_get_installed_terminfo(D), CapName, [A,B,C,D]).
 tparm(CapName, A,B,C,D,E) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E).
+    tparm_m(tp_get_installed_terminfo(E), CapName, [A,B,C,D,E]).
 tparm(CapName, A,B,C,D,E,F) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F).
+    tparm_m(tp_get_installed_terminfo(F), CapName, [A,B,C,D,E,F]).
 tparm(CapName, A,B,C,D,E,F,G) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G).
+    tparm_m(tp_get_installed_terminfo(G), CapName, [A,B,C,D,E,F,G]).
 tparm(CapName, A,B,C,D,E,F,G,H) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G,H).
+    tparm_m(tp_get_installed_terminfo(H), CapName, [A,B,C,D,E,F,G,H]).
 tparm(CapName, A,B,C,D,E,F,G,H,I) ->
-    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G,H,I).
+    tparm_m(tp_get_installed_terminfo(I), CapName, [A,B,C,D,E,F,G,H,I]).
+
+tp_get_installed_terminfo(SpecOrArg) ->
+  if is_map(SpecOrArg) -> get_installed_terminfo(SpecOrArg); % it's a spec
+     true              -> get_installed_terminfo() % it's an arg
+  end.
 
 tigetflag(CapName) ->
     tigetflag_m(get_installed_terminfo(), CapName).
 
+tigetflag(CapName, Spec) ->
+    tigetflag_m(get_installed_terminfo(Spec), CapName).
+
 tigetnum(CapName) ->
     tigetnum_m(get_installed_terminfo(), CapName).
+
+tigetnum(CapName, Spec) ->
+    tigetnum_m(get_installed_terminfo(Spec), CapName).
 
 tigetstr(CapName) ->
     tigetstr_m(get_installed_terminfo(), CapName).
 
+tigetstr(CapName, Spec) ->
+    tigetstr_m(get_installed_terminfo(Spec), CapName).
 
--spec tparm_m(terminfo(), cap_name()) -> out_seq().
-
-tparm_m(M, CapName) -> (maps:get(CapName, M))(#{}).
-tparm_m(M, CapName, A) -> (maps:get(CapName, M))(A,#{}).
-tparm_m(M, CapName, A,B) -> (maps:get(CapName, M))(A,B,#{}).
-tparm_m(M, CapName, A,B,C) -> (maps:get(CapName, M))(A,B,C,#{}).
-tparm_m(M, CapName, A,B,C,D) -> (maps:get(CapName, M))(A,B,C,D,#{}).
-tparm_m(M, CapName, A,B,C,D,E) -> (maps:get(CapName, M))(A,B,C,D,E,#{}).
-tparm_m(M, CapName, A,B,C,D,E,F) -> (maps:get(CapName, M))(A,B,C,D,E,F,#{}).
-tparm_m(M, CapName, A,B,C,D,E,F,G) ->
-    (maps:get(CapName, M))(A,B,C,D,E,F,G,#{}).
-tparm_m(M, CapName, A,B,C,D,E,F,G,H) ->
-    (maps:get(CapName, M))(A,B,C,D,E,F,G,H,#{}).
-tparm_m(M, CapName, A,B,C,D,E,F,G,H,I) ->
-    (maps:get(CapName, M))(A,B,C,D,E,F,G,H,I,#{}).
+-spec tparm_m(terminfo(), cap_name(), [term()]) -> out_seq().
+tparm_m(TermInfo, CapName, Args) ->
+    case TermInfo of
+        #{CapName := Cap} ->
+            %% Ensure map as last arg:
+            if Args == [] ->
+                    Cap(#{});
+               Args /= [] ->
+                    Args1 = case is_map(lists:last(Args)) of
+                                true -> Args;
+                                false -> Args ++ [#{}]
+                            end,
+                    apply(Cap, Args1)
+            end
+    end.
 
 tigetflag_m(M, CapName) ->
     case maps:find(CapName, M) of
