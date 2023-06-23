@@ -69,7 +69,7 @@ p(Data, EntryNum) ->
             case read_until_comma(Rest) of
                 {ok, S, Rest2} when EntryNum == 1 ->
                     Ids = string:tokens(S, "|"),
-                    {ok, {terminfo_id, Ids}, mk_cont(Rest2, EntryNum+1)};
+                    {ok, {'$terminfo_names', Ids}, mk_cont(Rest2, EntryNum+1)};
                 {ok, S, Rest2} when EntryNum > 1 ->
                     case parse_terminfo_string(S) of
                         {ok, Key, Value, LiteralValue} ->
@@ -117,22 +117,26 @@ read_until_comma("", _Acc)         -> need_more.
 parse_terminfo_string(S) ->
     case read_terminfo_key(S) of
         {ok, Key, ""} ->
-            {ok, Key, true, ""};
+            AKey = list_to_atom(Key),
+            {ok, AKey, true, ""};
         {ok, Key, "#"++Rest} ->
+            AKey = list_to_atom(Key),
             case read_number(Rest) of
-                {ok, N}         -> {ok, Key, N, Rest};
-                {error, Reason} -> {error, {bad_number, Key, Rest, Reason}}
+                {ok, N}         -> {ok, AKey, N, Rest};
+                {error, Reason} -> {error, {bad_number, AKey, Rest, Reason}}
             end;
         {ok, Key, "="++Rest} ->
+            AKey = list_to_atom(Key),
             case eterminfo_strscanner:string(Rest) of
                 {ok, Tokens, EndLine} ->
                     EndToken = {'$end', EndLine},
                     case eterminfo_strparser:parse(Tokens++[EndToken]) of
-                        {ok, Value}   -> {ok, Key, Value, Rest};
-                        {error, Info} -> {error, {parse_error, Key,Rest, Info}}
+                        {ok, Value}   -> {ok, AKey, Value, Rest};
+                        {error, Info} -> {error, {parse_error, AKey,
+                                                  Rest, Info}}
                     end;
                 {error, Info, _EndLine} ->
-                    {error, {scan_error, Key, Rest, Info}}
+                    {error, {scan_error, AKey, Rest, Info}}
             end;
         cancelled_key ->
             cancelled_key;

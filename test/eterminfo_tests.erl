@@ -23,32 +23,32 @@
 
 vt100_long_test() ->
     {ok, M} = parse_terminfo_str("vt100", vt100_long_lines()),
-    #{terminfo_id := ["vt100","vt100-am","dec vt100 "++_]} = M,
+    #{'$terminfo_names' := ["vt100","vt100-am","dec vt100 "++_]} = M,
     %% Numeric capability
-    #{"init_tabs" := 8} = M, %% tabs initially every # spaces
+    #{init_tabs := 8} = M, %% tabs initially every # spaces
     %% String capabilities
-    #{"carriage_return" := "\r",
-      "bell" := [7]} = M,
+    #{carriage_return := "\r",
+      bell := [7]} = M,
     %% Variable string capabilities
     StaticVars = #{}, %% any vars referenced with %g[A-Z] or %P[A-Z]
-    #{"parm_up_cursor"   := CUU,
-      "parm_down_cursor" := CUD} = M,
+    #{parm_up_cursor   := CUU,
+      parm_down_cursor := CUD} = M,
     "\e[1A" = CUU(1, StaticVars),
     "\e[1B" = CUD(1, StaticVars),
     ok.
 
 vt100_short_test() ->
     {ok, M} = parse_terminfo_str("vt100", vt100_short_lines()),
-    #{terminfo_id := ["vt100","vt100-am","dec vt100 "++_]} = M,
+    #{'$terminfo_names' := ["vt100","vt100-am","dec vt100 "++_]} = M,
     %% Numeric capability
-    #{"it" := 8} = M, %% tabs initially every # spaces
+    #{it := 8} = M, %% tabs initially every # spaces
     %% String capabilities
-    #{"cr" := "\r",
-      "bel" := [7]} = M,
+    #{cr := "\r",
+      bel := [7]} = M,
     %% Variable string capabilities
     StaticVars = #{}, %% any vars referenced with %g[A-Z] or %P[A-Z]
-    #{"cuu" := CUU, %% cursor up a parameterized number of lines
-      "cud" := CUD  %% cursor down a parameterized number of lines
+    #{cuu := CUU, %% cursor up a parameterized number of lines
+      cud := CUD  %% cursor down a parameterized number of lines
      } = M,
     "\e[1A" = CUU(1, StaticVars),
     "\e[1B" = CUD(1, StaticVars),
@@ -57,7 +57,7 @@ vt100_short_test() ->
 bool_capability_test() ->
     {ok, M} = parse_terminfo_str(["\tx,"]),
     %% fetch boolean capability "x"
-    #{"x" := true} = M.
+    #{x := true} = M.
 
 string_capability_test() ->
     {ok, M} = parse_terminfo_str(["\ts=abc,",
@@ -76,20 +76,20 @@ string_capability_test() ->
                                   "\tcolon=\\:,",
                                   "\tnul=\\0,"
                                  ]),
-    #{"s"          := "abc",
-      "escapes"    := "\e\e",
-      "ctrlchar"   := [7],
-      "newline"    := "\r\n",
-      "linefeed"   := "\n",
-      "return"     := "\r",
-      "backspace"  := "\b",
-      "formfeed"   := "\f",
-      "space"      := " ",
-      "circumflex" := "^",
-      "backslash"  := "\\",
-      "comma"      := ",",
-      "colon"      := ":",
-      "nul"        := [128]
+    #{s          := "abc",
+      escapes    := "\e\e",
+      ctrlchar   := [7],
+      newline    := "\r\n",
+      linefeed   := "\n",
+      return     := "\r",
+      backspace  := "\b",
+      formfeed   := "\f",
+      space      := " ",
+      circumflex := "^",
+      backslash  := "\\",
+      comma      := ",",
+      colon      := ":",
+      nul        := [128]
      } = M,
     ok.
 
@@ -97,9 +97,9 @@ delay_capability_test() ->
     %% $<5> means delay 5 milliseconds
     {ok, M} = parse_terminfo_str(["\ts=\eK$<5>,"]),
     %% fixme is this ok?
-    #{"s" := [27,75,{pad,#{delay        := 5,
-                           proportional := false,
-                           mandatory    := false}}]} = M.
+    #{s := [27,75,{pad,#{delay        := 5,
+                         proportional := false,
+                         mandatory    := false}}]} = M.
 
 %% Various parameterized string tests
 %%
@@ -111,7 +111,7 @@ delay_capability_test() ->
 
 paramstr_percent_test() ->
     {ok, M} = parse_terminfo_str(["\tpercent=%%,"]),
-    #{"percent" := "%"} = M.
+    #{percent := "%"} = M.
 
 paramstr_simple_push_pop_test() ->
     {ok, M} = parse_terminfo_str([%% push param(s), pop and printf with %d
@@ -126,12 +126,12 @@ paramstr_simple_push_pop_test() ->
                                   %% pushing a number
                                   "\tpushnum=%{65}%d,"
                                  ]),
-    #{"pushpop1" := PP1,
-      "pushpop2" := PP2,
-      "popstr"   := PS,
-      "popchar"  := PC,
-      "pushchar" := PX,
-      "pushnum"  := PN} = M,
+    #{pushpop1 := PP1,
+      pushpop2 := PP2,
+      popstr   := PS,
+      popchar  := PC,
+      pushchar := PX,
+      pushnum  := PN} = M,
     "1"  = PP1(1, []),
     "2"  = PP1(2, []),
     "21" = PP2(1,2, []),
@@ -159,16 +159,16 @@ paramstr_str_formatting_test() ->
                                   "\tstrleftw4=>%p1%:-4s<,",
                                   ""
                                  ]),
-    #{"rightw2"     := D1,
-      "leftw2"      := D2,
-      "hexleft1w4"  := X11,
-      "hexleft2w4"  := X12,
-      "hexleft3w6"  := X13,
-      "uhexleft1w4" := X21,
-      "uhexleft2w4" := X22,
-      "uhexleft3w6" := X23,
-      "octleftw4"   := O1,
-      "strleftw4"   := S1} = M,
+    #{rightw2     := D1,
+      leftw2      := D2,
+      hexleft1w4  := X11,
+      hexleft2w4  := X12,
+      hexleft3w6  := X13,
+      uhexleft1w4 := X21,
+      uhexleft2w4 := X22,
+      uhexleft3w6 := X23,
+      octleftw4   := O1,
+      strleftw4   := S1} = M,
     "> 2<"     = D1(2, []),
     ">2 <"     = D2(2, []),
     ">c0  <"   = X11(192, []),
@@ -188,7 +188,7 @@ paramstr_dyn_var_test() ->
                                   %% pop and printf it (%d)
                                   %% get+push and pop+printf it again
                                   "\tdynvar=%p1%Pa%ga%d%ga%d,"]),
-    #{"dynvar" := PP2} = M,
+    #{dynvar := PP2} = M,
     "22" = PP2(2, []).
 
 paramstr_static_var_test() ->
@@ -197,12 +197,12 @@ paramstr_static_var_test() ->
                  %% (uppercase A means static var instead
                  %% of dynamic)
                  "\tdynstaticvar=%p1%Pa%p2%PA%gA%d-%ga%d-%gC%d,"]),
-    #{"dynstaticvar" := PP3} = M,
+    #{dynstaticvar := PP3} = M,
     "3-4-5" = PP3(4, 3, #{"C" => 5}).
 
 paramstr_strlen_op_test() ->
     {ok, M} = parse_terminfo_str(["\tstrlen=%p1%l%d,"]),
-    #{"strlen" := L} = M,
+    #{strlen := L} = M,
     "6" = L("abcdef", []),
     "7" = L("abcdefg", []).
 
@@ -213,11 +213,11 @@ paramstr_bin_arith_op_test() ->
                                   "\tdiv=%p1%p2%/%d,",
                                   "\tmod=%p1%p2%m%d,"]),
     %% arithmetic operations
-    #{"add" := AAdd,
-      "sub" := ASub,
-      "mul" := AMul,
-      "div" := ADiv,
-      "mod" := AMod} = M,
+    #{'add' := AAdd,
+      'sub' := ASub,
+      'mul' := AMul,
+      'div' := ADiv,
+      'mod' := AMod} = M,
     "3"  = AAdd(1, 2, []),
     "4"  = ASub(6, 2, []),
     "12" = AMul(6, 2, []),
@@ -231,12 +231,12 @@ paramstr_arith_op_test() ->
                                   "\tdiv=%p1%p2%/%d,",
                                   "\tmod=%p1%p2%m%d,",
                                   "\tinc=%i%p1%d%p2%d,"]),
-    #{"add" := AAdd,
-      "sub" := ASub,
-      "mul" := AMul,
-      "div" := ADiv,
-      "mod" := AMod,
-      "inc" := AInc} = M,
+    #{'add' := AAdd,
+      'sub' := ASub,
+      'mul' := AMul,
+      'div' := ADiv,
+      'mod' := AMod,
+      'inc' := AInc} = M,
     "3"  = AAdd(1, 2, []),
     "4"  = ASub(6, 2, []),
     "12" = AMul(6, 2, []),
@@ -249,10 +249,10 @@ paramstr_bit_op_test() ->
                                   "\tor=%p1%p2%|%d,",
                                   "\txor=%p1%p2%^%d,",
                                   "\tnot=%p1%~%d,"]),
-    #{"and" := BAnd,
-      "or"  := BOr,
-      "xor" := BXor,
-      "not" := BNot} = M,
+    #{'and' := BAnd,
+      'or'  := BOr,
+      'xor' := BXor,
+      'not' := BNot} = M,
     "1"  = BAnd(1, 3, []),
     "7"  = BOr(6, 3, []),
     "5"  = BXor(6, 3, []),
@@ -262,9 +262,9 @@ paramstr_logical_op_test() ->
     {ok, M} = parse_terminfo_str(["\tand=%p1%p2%A%d,",
                                   "\tor=%p1%p2%O%d,",
                                   "\tnot=%p1%!%d,"]),
-    #{"and" := LAnd,
-      "or"  := LOr,
-      "not" := LNot} = M,
+    #{'and' := LAnd,
+      'or'  := LOr,
+      'not' := LNot} = M,
 
     "0"  = LAnd(1, 0, []),
     "1"  = LAnd(1, 3, []),
@@ -280,9 +280,9 @@ paramstr_cmp_op_test() ->
     {ok, M} = parse_terminfo_str(["\tlt=%p1%p2%<%d,",
                                   "\tgt=%p1%p2%>%d,",
                                   "\teq=%p1%p2%=%d,"]),
-    #{"lt" := LT,
-      "gt" := GT,
-      "eq" := EQ} = M,
+    #{lt := LT,
+      gt := GT,
+      eq := EQ} = M,
 
     "1"  = LT(2, 3, []),
     "0"  = LT(2, 2, []),
@@ -310,9 +310,9 @@ paramstr_if_then_else_test() ->
                  %% if-then-else-if-then-else
                  "\telsif=%?%p1%{3}%>%!%tt1%e%p1%{8}%<%tt2%ee%;,"]),
 
-    #{"ift" := IFT,     % if-then
-      "ifte" := IFTE,   % if-then-else
-      "elsif" := ElsIf  % if-then-elsif-else
+    #{ift := IFT,     % if-then
+      ifte := IFTE,   % if-then-else
+      elsif := ElsIf  % if-then-elsif-else
      } = M,
 
     "t" = IFT(3, []),

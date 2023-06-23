@@ -17,30 +17,30 @@ Example usage
   ok
 
   %% Reading a string capability: what string to send to produce a beep
-  > eterminfo:tigetstr("bell").
+  > eterminfo:tigetstr(bell).
   [7]
 
   %% Reading a numeric capability: tabs are initially 8 spaces wide
-  > eterminfo:tigetnum("init_tabs").
+  > eterminfo:tigetnum(init_tabs).
   8
 
   %% Reading a bool capability
-  > eterminfo:tigetflag("xon_xoff").
+  > eterminfo:tigetflag(xon_xoff).
   true
 
   %% Getting a parameterized capability.
   %% The parm_down_cursor capability takes one parameter, number of lines.
-  > eterminfo:tparm("parm_down_cursor", 10).
+  > eterminfo:tparm(parm_down_cursor, 10).
   "\e[10B"
 
   %% Reading the name of the terminfo.
-  > eterminfo:tigetstr(terminfo_id).
+  > eterminfo:tigetstr('$terminfo_names').
   ["vt100","vt100-am","DEC VT100 (w/advanced video)"]
 
   %% Capability string can have padding---delays in milliseconds---at some places.
   %% If the padding may be proportional to the number of lines.
   %% See terminfo(5) for more info.
-  > eterminfo:tparm("cursor_address", 10, 10).
+  > eterminfo:tparm(cursor_address, 10, 10).
   [27,91,49,49,59,49,49,72,
    {pad,#{delay => 5,mandatory => false,proportional => false}}]
 
@@ -48,15 +48,15 @@ Example usage
   %% For each parametersized capability, there is also a
   %% `{literal,Capability}` entry.
   > eterminfo:get_installed_terminfo().
-  #{"key_right" => "\eOC",
-    "enter_am_mode" => "\e[?7h","carriage_return" => "\r",
-    "exit_standout_mode" =>
+  #{key_right => "\eOC",
+    enter_am_mode => "\e[?7h","carriage_return" => "\r",
+    exit_standout_mode =>
         [27,91,109,
          {pad,#{delay => 2,mandatory => false,proportional => false}}],
-    "key_left" => "\eOD",
-    "parm_left_cursor" => #Fun<eterminfo_strparser.8.19824310>,
+    key_left => "\eOD",
+    parm_left_cursor => #Fun<...>,
     ...
-    {literal,"parm_left_cursor"} => "\\E[%p1%dD"",
+    {literal,parm_left_cursor} => "\\E[%p1%dD"",
     ...}
 ```
 

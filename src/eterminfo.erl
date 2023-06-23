@@ -38,15 +38,15 @@
 %% Example:
 %% ```
 %%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
-%%   {ok,#{"key_right" => "\eOC",
-%%         "enter_am_mode" => "\e[?7h",
-%%         "carriage_return" => "\r",
-%%         "exit_standout_mode" =>
+%%   {ok,#{key_right => "\eOC",
+%%         enter_am_mode => "\e[?7h",
+%%         carriage_return => "\r",
+%%         exit_standout_mode =>
 %%             [27,91,109,
 %%              {pad,#{delay => 2,mandatory => false,proportional => false}}],
-%%         "parm_left_cursor" => #Fun<...>,
+%%         parm_left_cursor => #Fun<...>,
 %%         ...}}
-%%   2> #{"parm_left_cursor" := Left} = M.
+%%   2> #{parm_left_cursor := Left} = M.
 %%   3> Left(10, #{}).
 %%   "\e[10D"
 %% '''
@@ -90,12 +90,12 @@
 -include_lib("kernel/include/file.hrl").
 
 -type term_name() :: string().
--type terminfo() :: #{terminfo_id := terminfo_id(),
+-type terminfo() :: #{'$terminfo_names' := terminfo_names(),
                       cap_name() => cap(),
                       literal_key(cap_name()) => string()}.
 
--type terminfo_id() :: [string()].
--type cap_name() :: string().
+-type terminfo_names() :: [string()].
+-type cap_name() :: atom().
 -type cap() :: out_seq() % string capabilities
              | integer() % numeric capabilities
              | boolean() % boolean capabilities
@@ -304,69 +304,72 @@ collect_stdout(Port, Acc) ->
 %% Keys are capability names (Capnames in the termcap(5) man page).
 %%
 
-tparm(Str) ->
-    tparm_m(get_installed_terminfo(), Str).
-tparm(Str, A) ->
-    tparm_m(get_installed_terminfo(), Str, A).
-tparm(Str, A,B) ->
-    tparm_m(get_installed_terminfo(), Str, A,B).
-tparm(Str, A,B,C) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C).
-tparm(Str, A,B,C,D) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D).
-tparm(Str, A,B,C,D,E) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E).
-tparm(Str, A,B,C,D,E,F) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F).
-tparm(Str, A,B,C,D,E,F,G) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G).
-tparm(Str, A,B,C,D,E,F,G,H) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G,H).
-tparm(Str, A,B,C,D,E,F,G,H,I) ->
-    tparm_m(get_installed_terminfo(), Str, A,B,C,D,E,F,G,H,I).
+tparm(CapName) ->
+    tparm_m(get_installed_terminfo(), CapName).
+tparm(CapName, A) ->
+    tparm_m(get_installed_terminfo(), CapName, A).
+tparm(CapName, A,B) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B).
+tparm(CapName, A,B,C) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C).
+tparm(CapName, A,B,C,D) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D).
+tparm(CapName, A,B,C,D,E) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E).
+tparm(CapName, A,B,C,D,E,F) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F).
+tparm(CapName, A,B,C,D,E,F,G) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G).
+tparm(CapName, A,B,C,D,E,F,G,H) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G,H).
+tparm(CapName, A,B,C,D,E,F,G,H,I) ->
+    tparm_m(get_installed_terminfo(), CapName, A,B,C,D,E,F,G,H,I).
 
-tigetflag(Str) ->
-    tigetflag_m(get_installed_terminfo(), Str).
+tigetflag(CapName) ->
+    tigetflag_m(get_installed_terminfo(), CapName).
 
-tigetnum(Str) ->
-    tigetnum_m(get_installed_terminfo(), Str).
+tigetnum(CapName) ->
+    tigetnum_m(get_installed_terminfo(), CapName).
 
-tigetstr(Str) ->
-    tigetstr_m(get_installed_terminfo(), Str).
+tigetstr(CapName) ->
+    tigetstr_m(get_installed_terminfo(), CapName).
 
 
 -spec tparm_m(terminfo(), cap_name()) -> out_seq().
 
-tparm_m(M, Str) -> (maps:get(Str, M))(#{}).
-tparm_m(M, Str, A) -> (maps:get(Str, M))(A,#{}).
-tparm_m(M, Str, A,B) -> (maps:get(Str, M))(A,B,#{}).
-tparm_m(M, Str, A,B,C) -> (maps:get(Str, M))(A,B,C,#{}).
-tparm_m(M, Str, A,B,C,D) -> (maps:get(Str, M))(A,B,C,D,#{}).
-tparm_m(M, Str, A,B,C,D,E) -> (maps:get(Str, M))(A,B,C,D,E,#{}).
-tparm_m(M, Str, A,B,C,D,E,F) -> (maps:get(Str, M))(A,B,C,D,E,F,#{}).
-tparm_m(M, Str, A,B,C,D,E,F,G) -> (maps:get(Str, M))(A,B,C,D,E,F,G,#{}).
-tparm_m(M, Str, A,B,C,D,E,F,G,H) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,#{}).
-tparm_m(M, Str, A,B,C,D,E,F,G,H,I) -> (maps:get(Str, M))(A,B,C,D,E,F,G,H,I,#{}).
+tparm_m(M, CapName) -> (maps:get(CapName, M))(#{}).
+tparm_m(M, CapName, A) -> (maps:get(CapName, M))(A,#{}).
+tparm_m(M, CapName, A,B) -> (maps:get(CapName, M))(A,B,#{}).
+tparm_m(M, CapName, A,B,C) -> (maps:get(CapName, M))(A,B,C,#{}).
+tparm_m(M, CapName, A,B,C,D) -> (maps:get(CapName, M))(A,B,C,D,#{}).
+tparm_m(M, CapName, A,B,C,D,E) -> (maps:get(CapName, M))(A,B,C,D,E,#{}).
+tparm_m(M, CapName, A,B,C,D,E,F) -> (maps:get(CapName, M))(A,B,C,D,E,F,#{}).
+tparm_m(M, CapName, A,B,C,D,E,F,G) ->
+    (maps:get(CapName, M))(A,B,C,D,E,F,G,#{}).
+tparm_m(M, CapName, A,B,C,D,E,F,G,H) ->
+    (maps:get(CapName, M))(A,B,C,D,E,F,G,H,#{}).
+tparm_m(M, CapName, A,B,C,D,E,F,G,H,I) ->
+    (maps:get(CapName, M))(A,B,C,D,E,F,G,H,I,#{}).
 
-tigetflag_m(M, Str) ->
-    case maps:find(Str, M) of
+tigetflag_m(M, CapName) ->
+    case maps:find(CapName, M) of
         {ok, true}  -> true;
         {ok, false} -> false;
-        {ok, _}     -> {error, {not_a_boolean_capability, Str}};
+        {ok, _}     -> {error, {not_a_boolean_capability, CapName}};
         error       -> false
     end.
 
-tigetnum_m(M, Str) ->
-    case maps:find(Str, M) of
+tigetnum_m(M, CapName) ->
+    case maps:find(CapName, M) of
         {ok, N} when is_integer(N) -> N;
-        {ok, X}                    -> {error,{not_a_numeric_capability,Str,X}};
-        error                      -> 0
+        {ok, X} -> {error,{not_a_numeric_capability,CapName,X}};
+        error   -> 0
     end.
 
-tigetstr_m(M, Str) ->
-    case maps:find(Str, M) of
+tigetstr_m(M, CapName) ->
+    case maps:find(CapName, M) of
         {ok, S} when is_list(S)     -> S;
-        {ok, F} when is_function(F) -> maps:get({literal,Str}, M);
-        {ok, X}                     -> {error,{not_a_string_capability,Str,X}};
-        error                       -> {error,{string_capability_not_found,Str}}
+        {ok, F} when is_function(F) -> maps:get({literal,CapName}, M);
+        {ok, X} -> {error,{not_a_string_capability,CapName,X}};
+        error   -> {error,{string_capability_not_found,CapName}}
     end.
