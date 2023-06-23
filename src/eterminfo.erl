@@ -121,6 +121,13 @@
                              ?infocmp_opt_assocs,
                              _ => _}.
 
+-type install_spec() :: #{term => term_name(),
+                          ?name_format_opt_assocs,
+                          _ => _}.
+
+-type install_key() :: #{term := term_name(),
+                         cap_names := cap_name_format()}.
+
 %% @equiv install_by_infocmp(#{})
 install_by_infocmp() ->
     install_by_infocmp(#{}).
@@ -142,10 +149,10 @@ install_by_infocmp() ->
 %% --------------------------------------------------------------------
 -spec install_by_infocmp(infocmp_install()) -> ok | {error, term()}.
 install_by_infocmp(Spec) ->
-    TermType = maps:get(term, Spec, get_term_type_or_default()),
+    TermType = get_term_type(Spec),
     case setup_by_infocmp(TermType, Spec) of
         {ok, TermInfo} ->
-            install_terminfo(TermType, TermInfo),
+            install_terminfo(Spec, TermInfo),
             ok;
         {error, Reason} ->
             {error, Reason}
@@ -156,7 +163,7 @@ install_by_infocmp(Spec) ->
 %% Example:
 %% ```
 %%   1> eterminfo:get_term_type().
-%%   "vt100"
+%%   "ansi"
 %% '''
 %% @end
 %%--------------------------------------------------------------------
@@ -174,10 +181,10 @@ get_term_type_or_default() ->
 %% @doc Retrieve the current terminal type, or a default.
 %% Example:
 %% ```
-%%   1> eterminfo:get_term_type("ansi").
+%%   1> eterminfo:get_term_type_or_default("ansi").
 %%   "vt100"
 %%   2> os:unsetenv("TERM").
-%%   3> eterminfo:get_term_type("ansi").
+%%   3> eterminfo:get_term_type_or_default("ansi").
 %%   "ansi"
 %% '''
 %% @end
@@ -193,13 +200,15 @@ get_term_type_or_default(Default) ->
 %% persistent term.
 %% @end
 %%--------------------------------------------------------------------
-install_terminfo(TermType, TermInfo) ->
-    persistent_term:put({?MODULE, TermType}, TermInfo).
+-spec install_terminfo(install_spec(), terminfo()) -> ok.
+install_terminfo(Spec, TermInfo) ->
+    InstKey = ensure_install_key(Spec),
+    persistent_term:put({?MODULE, InstKey}, TermInfo),
+    ok.
 
-
-%% @equiv get_term_type_or_default(get_term_type_or_default())
+%% @equiv is_terminfo_installed(#{})
 is_terminfo_installed() ->
-    is_terminfo_installed(get_term_type_or_default()).
+    is_terminfo_installed(#{}).
 
 %%--------------------------------------------------------------------
 %% @doc Check if a terminal type is installed.
@@ -214,18 +223,55 @@ is_terminfo_installed() ->
 %% '''
 %% @end
 %%--------------------------------------------------------------------
-is_terminfo_installed(TermType) ->
-    try persistent_term:get({?MODULE, TermType}) of
+-spec is_terminfo_installed(install_spec()) -> boolean().
+is_terminfo_installed(Spec) ->
+    InstKey = ensure_install_key(Spec),
+    try persistent_term:get({?MODULE, InstKey}) of
         _ -> true
     catch error:badarg ->
             false
     end.
 
+%% @equiv get_installed_terminfo(#{})
 get_installed_terminfo() ->
-    get_installed_terminfo(get_term_type_or_default()).
+    get_installed_terminfo(#{}).
 
-get_installed_terminfo(TermType) ->
-    persistent_term:get({?MODULE, TermType}).
+%%--------------------------------------------------------------------
+%% @doc Get an installed terminfo.
+%% @end
+%%--------------------------------------------------------------------
+-spec get_installed_terminfo(install_spec()) -> terminfo().
+get_installed_terminfo(Spec) ->
+    InstKey = ensure_install_key(Spec),
+    persistent_term:get({?MODULE, InstKey}).
+
+%%- - - - - - - - - - - -
+%% install key helpers
+%%
+-spec ensure_install_key(install_spec()) -> install_key().
+ensure_install_key(#{term := _,
+                     cap_names := _}=InstKey) when map_size(InstKey) == 2 ->
+    InstKey; % don't rebuild it if it is already an install_key
+ensure_install_key(#{term := _, cap_names := _}=Spec) ->
+    maps:with([term, cap_names], Spec);
+ensure_install_key(Spec) ->
+    #{term      => get_term_type(Spec),
+      cap_names => get_cap_name_format(Spec)}.
+
+get_term_type(Spec) ->
+    case Spec of
+        #{term := TermType} -> TermType;
+        #{} -> get_term_type_or_default()
+    end.
+
+get_cap_name_format(Opts) ->
+    case Opts of
+        #{cap_names := terminfo} -> terminfo;
+        #{cap_names := long}     -> long;
+        #{cap_names := _}        -> error(badarg);
+        #{}                      -> terminfo % default
+    end.
+%%- - - - - - - - - - - -
 
 
 %% @equiv setup_by_infocmp(TermType, #{})
@@ -241,11 +287,9 @@ setup_by_infocmp(TermType) ->
 -spec setup_by_infocmp(term_name(), infocmp_opts()) ->
           {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType, Opts) ->
-    ProgOpts = case Opts of
-                   #{cap_names := terminfo} -> ["-I"];
-                   #{cap_names := long}     -> ["-L"];
-                   #{cap_names := _}        -> erlang:error(badarg);
-                   #{}                      -> ["-I"] % Default (terminfo names)
+    ProgOpts = case get_cap_name_format(Opts) of
+                   terminfo -> ["-I"];
+                   long     -> ["-L"]
                end,
     case find_infocmp(Opts) of
         false ->
