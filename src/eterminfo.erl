@@ -37,7 +37,7 @@
 %%
 %% Example:
 %% ```
-%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", [long_names]).
+%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", #{cap_names => long}).
 %%   {ok,#{key_right => "\eOC",
 %%         enter_am_mode => "\e[?7h",
 %%         carriage_return => "\r",
@@ -82,7 +82,7 @@
 -export([tigetstr_m/2]).
 
 -export_type([term_name/0, terminfo/0]).
--export_type([infocmp_opts/0, infocmp_opt/0]).
+-export_type([infocmp_opts/0]).
 
 %%--------------------------------------------------------------------
 %% Include files
@@ -106,12 +106,20 @@
                        proportional := boolean(),
                        mandatory := boolean()}}.
 
--type bool_opt(Opt) :: Opt | {Opt, boolean()}.
+-type cap_name_format() :: terminfo | long.
 
--type infocmp_opts() :: [infocmp_opt() | _IgnoredOpt::term()].
--type infocmp_opt() :: bool_opt(terminfo_names)
-                     | bool_opt(long_names).
+-define(name_format_opt_assocs,
+        cap_names => cap_name_format()).
 
+-define(infocmp_opt_assocs,
+        ?name_format_opt_assocs).
+
+-type infocmp_opts() :: #{?infocmp_opt_assocs,
+                          _ => _}.
+
+-type infocmp_install() :: #{term => term_name(),
+                             ?infocmp_opt_assocs,
+                             _ => _}.
 
 %% @equiv install_by_infocmp(#{})
 install_by_infocmp() ->
@@ -120,7 +128,7 @@ install_by_infocmp() ->
 %%--------------------------------------------------------------------
 %% @doc Read a terminfo definition using the `infocmp' program and
 %%      install it. By default, it will try to find terminfo for `$TERM'
-%% with long names.
+%%      with terminfo names.
 %%
 %% The {@link tparm/1}..{@link tparm/10}, {@link tigetflag/1}, {@link
 %% tigetnum/1} and {@link tigetstr/1} functions use the installed
@@ -132,13 +140,10 @@ install_by_infocmp() ->
 %% It is intended to be invoked only once initially.
 %% @end
 %% --------------------------------------------------------------------
+-spec install_by_infocmp(infocmp_install()) -> ok | {error, term()}.
 install_by_infocmp(Spec) ->
     TermType = maps:get(term, Spec, get_term_type_or_default()),
-    LongNamesOpts = case maps:get(long_names, Spec, true) of
-                        true -> [long_names];
-                        false -> []
-                    end,
-    case setup_by_infocmp(TermType, LongNamesOpts) of
+    case setup_by_infocmp(TermType, Spec) of
         {ok, TermInfo} ->
             install_terminfo(TermType, TermInfo),
             ok;
@@ -223,10 +228,10 @@ get_installed_terminfo(TermType) ->
     persistent_term:get({?MODULE, TermType}).
 
 
-%% @equiv setup_by_infocmp(TermType, [])
+%% @equiv setup_by_infocmp(TermType, #{})
 -spec setup_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType) ->
-    setup_by_infocmp(TermType, _Opts=[]).
+    setup_by_infocmp(TermType, #{}).
 
 %%--------------------------------------------------------------------
 %% @doc Use the `infocmp' program to read terminal info by terminal name.
@@ -236,12 +241,11 @@ setup_by_infocmp(TermType) ->
 -spec setup_by_infocmp(term_name(), infocmp_opts()) ->
           {ok, terminfo()} | {error, term()}.
 setup_by_infocmp(TermType, Opts) ->
-    ProgOpts = case {proplists:get_bool(terminfo_names, Opts),
-                     proplists:get_bool(long_names, Opts)} of
-                   {false, false} -> []; %% Default (termcap names)
-                   {true,  false} -> []; %% Default (termcap names)
-                   {false,  true} -> ["-L"];
-                   _              -> erlang:error(badarg)
+    ProgOpts = case Opts of
+                   #{cap_names := terminfo} -> ["-I"];
+                   #{cap_names := long}     -> ["-L"];
+                   #{cap_names := _}        -> erlang:error(badarg);
+                   #{}                      -> ["-I"] % Default (terminfo names)
                end,
     case find_infocmp(Opts) of
         false ->
@@ -261,15 +265,15 @@ setup_by_infocmp(TermType, Opts) ->
     end.
 
 find_infocmp(Opts) ->
-    case proplists:get_value(terminfo_string, Opts) of
-        undefined ->
+    case Opts of
+        #{} when not is_map_key(terminfo_string, Opts) ->
             case os:find_executable("infocmp") of
                 false ->
                     os:find_executable("infocmp", "/bin:/usr/bin");
                 Program ->
                     Program
             end;
-        String ->
+        #{terminfo_string := String} ->
             %% use this value instead of the output from infocmp
             {terminfo_str, String}
     end.

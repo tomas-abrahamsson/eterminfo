@@ -333,7 +333,7 @@ parse_terminfo_str(CapabilityLines) ->
 
 parse_terminfo_str(TermName, Lines) ->
     S = ensure_ends_with_newline(string:join(Lines, "\n")),
-    Opts = [{terminfo_string, S}],
+    Opts = #{terminfo_string => S},
     eterminfo:setup_by_infocmp(TermName, Opts).
 
 ensure_ends_with_newline(S) ->
