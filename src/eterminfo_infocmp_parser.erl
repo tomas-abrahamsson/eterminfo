@@ -136,11 +136,12 @@ parse_terminfo_string(S) ->
             end;
         {ok, Key, "="++Rest} ->
             AKey = list_to_atom(Key),
-            case eterminfo_strscanner:string(Rest) of
+            CapStr = eterminfo_infocmp_scanner:string(Rest),
+            case eterminfo_strcap_scanner:string(CapStr) of
                 {ok, Tokens, EndLine} ->
                     EndToken = {'$end', EndLine},
-                    case eterminfo_strparser:parse(Tokens++[EndToken]) of
-                        {ok, Value}   -> {ok, AKey, Value, Rest};
+                    case eterminfo_strcap_parser:parse(Tokens++[EndToken]) of
+                        {ok, Value}   -> {ok, AKey, Value, CapStr};
                         {error, Info} -> {error, {parse_error, AKey,
                                                   Rest, Info}}
                     end;

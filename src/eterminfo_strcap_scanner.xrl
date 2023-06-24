@@ -23,24 +23,6 @@ Definitions.
 
 Rules.
 
-\\E  :         {token, {char, TokenLine, 27}}.
-\\e  :         {token, {char, TokenLine, 27}}.
-\^.  :         {token, {char, TokenLine, extr_ctrlchar(TokenChars)}}.
-\\,  :         {token, {char, TokenLine, $,}}.
-\\:  :         {token, {char, TokenLine, $:}}.
-\\\^ :         {token, {char, TokenLine, $^}}.
-\\\\ :         {token, {char, TokenLine, $\\}}.
-\\0 :          {token, {char, TokenLine, $\200}}.
-\\[0-3][0-7][0-7] :
-               {token, {char, TokenLine, extr_oct(TokenChars)}}.
-\\n  :         {token, {chars,TokenLine, [13,10]}}. %% newline
-\\l  :         {token, {char, TokenLine, 10}}.    %% line-feed
-\\r  :         {token, {char, TokenLine, 13}}.    %% return
-\\t  :         {token, {char, TokenLine, 9}}.     %% tab
-\\b  :         {token, {char, TokenLine, 8}}.     %% backspace
-\\f  :         {token, {char, TokenLine, 12}}.    %% form-feed
-\\s  :         {token, {char, TokenLine, 32}}.    %% space
-
 \%\%    :      {token, {char, TokenLine, $%}}.
 \%((:?([+#\s-])*)?([1-9][0-9]*(\.([-]?[0-9]+)?)?)?)?[doxXs]        :
                {token, {pop,  TokenLine,{printf,split_fmt_str(TokenChars)}}}.
@@ -79,6 +61,7 @@ Rules.
                {token, {pad,  TokenLine, extr_padding(TokenChars)}}.
 
 .    :         {token, {char, TokenLine, hd(TokenChars)}}.
+\n   :         {token, {char, TokenLine, hd(TokenChars)}}.
 
 Erlang code.
 
@@ -107,19 +90,6 @@ Erlang code.
 %%--------------------------------------------------------------------
 
 %% extraction routines...
-
-extr_ctrlchar([$^, $@])  -> 0;
-extr_ctrlchar([$^, C]) when C >= $A, C =< $Z -> C - $A + 1;
-extr_ctrlchar([$^, C]) when C >= $a, C =< $z -> C - $a + 1;
-extr_ctrlchar([$^, $\[]) -> 27;
-extr_ctrlchar([$^, $\\]) -> 28;
-extr_ctrlchar([$^, $\]]) -> 29;
-extr_ctrlchar([$^, $^])  -> 30;
-extr_ctrlchar([$^, $_])  -> 31.
-
-
-extr_oct([$\\, O1, O2, O3]) ->
-    ((O1 - $0) bsl (3+3)) + ((O2 - $0) bsl 3) + (O3 - $0).
 
 extr_paramnum("%p"++[N]) -> N - $0.
 extr_var("%g"++V) -> V;

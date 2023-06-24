@@ -1,6 +1,6 @@
 *.beam
-/src/eterminfo_strparser.erl
-/src/eterminfo_strscanner.erl
+/src/eterminfo_strcap_parser.erl
+/src/eterminfo_strcap_scanner.erl
 /.eunit/*
 /doc/*
 /ebin/eterminfo.app
