@@ -370,7 +370,7 @@ parse_terminfo_str(CapabilityLines) ->
 parse_terminfo_str(TermName, Lines) ->
     S = ensure_ends_with_newline(string:join(Lines, "\n")),
     Opts = #{terminfo_string => S},
-    eterminfo:setup_by_infocmp(TermName, Opts).
+    eterminfo:read_by_infocmp(TermName, Opts).
 
 ensure_ends_with_newline(S) ->
     case lists:last(S) of
@@ -382,7 +382,7 @@ parse_terminfo_file_from_hexdump(TermName, HexDump) ->
     Bin = <<<<(list_to_integer([C], 16)):4>>
             || <<C>> <= iolist_to_binary(HexDump),
                is_hex_digit(C)>>,
-    eterminfo:setup_by_file(TermName, #{terminfo_bin => Bin}).
+    eterminfo:read_by_file(TermName, #{terminfo_bin => Bin}).
 
 is_hex_digit(D) when $0 =< D, D =< $9 -> true;
 is_hex_digit(D) when $A =< D, D =< $F -> true;

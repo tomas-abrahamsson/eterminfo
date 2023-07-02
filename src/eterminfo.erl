@@ -37,7 +37,7 @@
 %%
 %% Example:
 %% ```
-%%   1> {ok, M} = eterminfo:setup_by_infocmp("vt100", #{cap_names => long}).
+%%   1> {ok, M} = eterminfo:read_by_infocmp("vt100", #{cap_names => long}).
 %%   {ok,#{key_right => "\eOC",
 %%         enter_am_mode => "\e[?7h",
 %%         carriage_return => "\r",
@@ -70,8 +70,8 @@
 
 %% Lower-level contituents api:
 
--export([setup_by_file/1, setup_by_file/2]).
--export([setup_by_infocmp/1, setup_by_infocmp/2]).
+-export([read_by_file/1, read_by_file/2]).
+-export([read_by_infocmp/1, read_by_infocmp/2]).
 -export([install_terminfo/2]).
 -export([is_terminfo_installed/0, is_terminfo_installed/1]).
 -export([get_installed_terminfo/0, get_installed_terminfo/1]).
@@ -158,7 +158,7 @@ install_by_file() ->
 -spec install_by_file(file_install()) -> ok | {error, term()}.
 install_by_file(Spec) ->
     TermType = get_term_type(Spec),
-    case setup_by_file(TermType, Spec) of
+    case read_by_file(TermType, Spec) of
         {ok, TermInfo} ->
             install_terminfo(Spec, TermInfo),
             ok;
@@ -188,7 +188,7 @@ install_by_infocmp() ->
 -spec install_by_infocmp(infocmp_install()) -> ok | {error, term()}.
 install_by_infocmp(Spec) ->
     TermType = get_term_type(Spec),
-    case setup_by_infocmp(TermType, Spec) of
+    case read_by_infocmp(TermType, Spec) of
         {ok, TermInfo} ->
             install_terminfo(Spec, TermInfo),
             ok;
@@ -312,19 +312,19 @@ get_cap_name_format(Opts) ->
 %%- - - - - - - - - - - -
 
 
-%% @equiv setup_by_file(TermType, #{})
--spec setup_by_file(term_name()) -> {ok, terminfo()} | {error, term()}.
-setup_by_file(TermType) ->
-    setup_by_file(TermType, #{}).
+%% @equiv read_by_file(TermType, #{})
+-spec read_by_file(term_name()) -> {ok, terminfo()} | {error, term()}.
+read_by_file(TermType) ->
+    read_by_file(TermType, #{}).
 
 %%--------------------------------------------------------------------
 %% @doc Locate a terminfo file and read it.
 %% Return a map with capability entries.
 %% @end.
 %%--------------------------------------------------------------------
--spec setup_by_file(term_name(), file_opts()) ->
+-spec read_by_file(term_name(), file_opts()) ->
           {ok, terminfo()} | {error, term()}.
-setup_by_file(TermType, Opts) ->
+read_by_file(TermType, Opts) ->
     %% Currently handles only terminfo files
     %% Handle termcap too?
     %% Handle hashed database too? (bdb format)
@@ -341,19 +341,19 @@ setup_by_file(TermType, Opts) ->
             {error, {terminfo_file_not_found, Reason}}
     end.
 
-%% @equiv setup_by_infocmp(TermType, #{})
--spec setup_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.
-setup_by_infocmp(TermType) ->
-    setup_by_infocmp(TermType, #{}).
+%% @equiv read_by_infocmp(TermType, #{})
+-spec read_by_infocmp(term_name()) -> {ok, terminfo()} | {error, term()}.
+read_by_infocmp(TermType) ->
+    read_by_infocmp(TermType, #{}).
 
 %%--------------------------------------------------------------------
 %% @doc Use the `infocmp' program to read terminal info by terminal name.
 %% Return a map with capability entries.
 %% @end
 %%--------------------------------------------------------------------
--spec setup_by_infocmp(term_name(), infocmp_opts()) ->
+-spec read_by_infocmp(term_name(), infocmp_opts()) ->
           {ok, terminfo()} | {error, term()}.
-setup_by_infocmp(TermType, Opts) ->
+read_by_infocmp(TermType, Opts) ->
     ProgOpts = case get_cap_name_format(Opts) of
                    terminfo -> ["-I"];
                    long     -> ["-L"]
