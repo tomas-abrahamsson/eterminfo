@@ -88,6 +88,7 @@
 -export_type([term_name/0, terminfo/0]).
 -export_type([file_opts/0]).
 -export_type([infocmp_opts/0]).
+-export_type([install_spec/0, install_handler/0]).
 
 %%--------------------------------------------------------------------
 %% Include files
@@ -138,8 +139,21 @@
                              _ => _}.
 
 -type install_spec() :: #{term => term_name(),
+                          %% Defaults to use persistent_term
+                          install_handler => install_handler(),
                           ?name_format_opt_assocs,
                           _ => _}.
+
+-type install_handler() ::
+        %% A module exporting
+        %% - put_termcap/2,
+        %% - get_termcap/1,
+        %% - erase_termcap/1
+        %% with the same semantics as persistent_term:put/2, get/1 and erase/1.
+        module() |
+        #{put_terminfo   := fun((term_name(), terminfo()) -> ok),
+          get_terminfo   := fun((term_name()) -> terminfo()), % or badarg
+          erase_terminfo := fun((term_name()) -> boolean())}.
 
 -type install_key() :: #{term := term_name(),
                          cap_names := cap_name_format()}.
@@ -214,7 +228,8 @@ install_by_infocmp(Spec) ->
 -spec uninstall(install_spec()) -> ok | {error, term()}.
 uninstall(Spec) ->
     InstKey = ensure_install_key(Spec),
-    case persistent_term:erase({?MODULE, InstKey}) of
+    Handler = ensure_install_handler(Spec),
+    case call_inst_handler(Handler, erase_terminfo, [InstKey]) of
         true  -> ok;
         false -> {error, {not_installed, Spec}}
     end.
@@ -264,8 +279,8 @@ get_term_type_or_default(Default) ->
 -spec install_terminfo(install_spec(), terminfo()) -> ok.
 install_terminfo(Spec, TermInfo) ->
     InstKey = ensure_install_key(Spec),
-    persistent_term:put({?MODULE, InstKey}, TermInfo),
-    ok.
+    Handler = ensure_install_handler(Spec),
+    call_inst_handler(Handler, put_terminfo, [InstKey, TermInfo]).
 
 %% @equiv is_terminfo_installed(#{})
 is_terminfo_installed() ->
@@ -287,7 +302,8 @@ is_terminfo_installed() ->
 -spec is_terminfo_installed(install_spec()) -> boolean().
 is_terminfo_installed(Spec) ->
     InstKey = ensure_install_key(Spec),
-    try persistent_term:get({?MODULE, InstKey}) of
+    Handler = ensure_install_handler(Spec),
+    try call_inst_handler(Handler, get_terminfo, [InstKey]) of
         _ -> true
     catch error:badarg ->
             false
@@ -304,10 +320,11 @@ get_installed_terminfo() ->
 -spec get_installed_terminfo(install_spec()) -> terminfo().
 get_installed_terminfo(Spec) ->
     InstKey = ensure_install_key(Spec),
-    persistent_term:get({?MODULE, InstKey}).
+    Handler = ensure_install_handler(Spec),
+    call_inst_handler(Handler, get_terminfo, [InstKey]).
 
 %%- - - - - - - - - - - -
-%% install key helpers
+%% install key and mod helpers
 %%
 -spec ensure_install_key(install_spec()) -> install_key().
 ensure_install_key(#{term := _,
@@ -332,6 +349,40 @@ get_cap_name_format(Opts) ->
         #{cap_names := _}        -> error(badarg);
         #{}                      -> terminfo % default
     end.
+
+-spec ensure_install_handler(install_spec()) -> install_handler().
+ensure_install_handler(#{install_handler := Handler}) ->
+    Handler;
+ensure_install_handler(#{}) ->
+    #{put_terminfo   => fun put_terminfo/2,
+      get_terminfo   => fun get_terminfo/1,
+      erase_terminfo => fun erase_terminfo/1}.
+
+-spec call_inst_handler(install_handler(), Fn, [term()]) -> term() when
+      Fn :: put_terminfo | get_terminfo | erase_terminfo.
+call_inst_handler(InstMod, Fn, Args) when is_atom(InstMod) ->
+    case Args of
+        [Arg]        -> InstMod:Fn(Arg);
+        [Arg1, Arg2] -> InstMod:Fn(Arg1, Arg2)
+    end;
+call_inst_handler(Map, Fn, Args) when is_map(Map) ->
+    case {Map, Args} of
+        {#{Fn := F}, [Arg]}        -> F(Arg);
+        {#{Fn := F}, [Arg1, Arg2]} -> F(Arg1, Arg2)
+    end.
+
+-spec put_terminfo(install_key(), terminfo()) -> ok.
+put_terminfo(InstKey, TermInfo) ->
+    persistent_term:put({?MODULE, InstKey}, TermInfo).
+
+-spec get_terminfo(install_key()) -> terminfo(). % or badarg
+get_terminfo(InstKey) ->
+    persistent_term:get({?MODULE, InstKey}).
+
+-spec erase_terminfo(install_key()) -> boolean().
+erase_terminfo(InstKey) ->
+    persistent_term:erase({?MODULE, InstKey}).
+
 %%- - - - - - - - - - - -
 
 
