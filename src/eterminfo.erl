@@ -60,6 +60,7 @@
 %%--------------------------------------------------------------------
 -export([install_by_file/0, install_by_file/1]).
 -export([install_by_infocmp/0, install_by_infocmp/1]).
+-export([uninstall/1]).
 
 -export([tparm/1, tparm/2, tparm/3, tparm/4, tparm/5]).
 -export([tparm/6, tparm/7, tparm/8, tparm/9, tparm/10]).
@@ -194,6 +195,28 @@ install_by_infocmp(Spec) ->
             ok;
         {error, Reason} ->
             {error, Reason}
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc Uninstall a terminfo structure. Note that since the terminfo
+%% structure is stored as a persistent_term, this will trigger a
+%% system-wide garbage-collect.
+%%
+%% Example:
+%% ```
+%%   1> eterminfo:uninstall_spec(#{term => "vt100", cap_names => long}).
+%%   ok
+%%   2> eterminfo:uninstall_spec(#{}).
+%%   ok
+%% '''
+%% @end
+%%--------------------------------------------------------------------
+-spec uninstall(install_spec()) -> ok | {error, term()}.
+uninstall(Spec) ->
+    InstKey = ensure_install_key(Spec),
+    case persistent_term:erase({?MODULE, InstKey}) of
+        true  -> ok;
+        false -> {error, {not_installed, Spec}}
     end.
 
 %%--------------------------------------------------------------------
