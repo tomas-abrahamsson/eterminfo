@@ -1,5 +1,3 @@
-%% This line tells emacs to use -*- erlang -*- mode for this file
-
 %%% Copyright (C) 2013  Tomas Abrahamsson
 %%%
 %%% Author: Tomas Abrahamsson <tab@lysator.liu.se>
@@ -19,52 +17,12 @@
 %%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 %%% MA  02110-1301  USA
 
-Nonterminals
-        ti ti_elements ti_element
-        expr expr_element
-        if_then_else then_else elses
-        .
-Terminals
-        char chars pad
-        pop push
-        op2 op1
-        'if' then else endif
-        .
-Rootsymbol
-        ti.
-Endsymbol
-        '$end'.
+%% Parse a compiled terminfo filee such as /lib/terminfo/v/vt100
+%%
+%% Use eterminfo_strscanner and eterminfo_strparser
+%% to parse string capabilities.
 
-ti ->   ti_elements:                    finalize('$1').
-
-ti_elements -> ti_element ti_elements:  ['$1' | '$2'].
-ti_elements -> '$empty':                [].
-
-ti_element -> char:                     mk_char('$1').
-ti_element -> chars:                    mk_chars('$1').
-ti_element -> pad:                      mk_pad('$1').
-ti_element -> expr:                     '$1'.
-
-
-expr -> expr_element expr:              ['$1' | '$2'].
-expr -> expr_element:                   ['$1'].
-
-expr_element -> push:                   mk_push('$1').
-expr_element -> pop:                    mk_pop('$1').
-expr_element -> op1:                    mk_unary_op('$1').
-expr_element -> op2:                    mk_binary_op('$1').
-expr_element -> if_then_else:           '$1'.
-
-if_then_else -> 'if' then_else:         '$2'.
-
-then_else -> expr then ti_elements endif:       mk_if('$1', '$3').
-then_else -> expr then ti_elements elses:       mk_if('$1', '$3','$4').
-
-elses -> else ti_elements endif:        mk_else('$2').
-elses -> else then_else:                mk_else('$2').
-elses -> else endif:                    mk_else({}).
-
-Erlang code.
+-module(eterminfo_strcap_parser).
 
 -import(lists, [foldl/3]).
 
@@ -72,7 +30,9 @@ Erlang code.
 %% API
 %%--------------------------------------------------------------------
 
--export([]).
+-export([parse/1]).
+
+-export_type([input/0, input_elem/0, parsed/0, pstr/0, pfun/0]).
 
 %% For testing...
 -export([deep_char_list_or_padding/1]).
@@ -90,6 +50,55 @@ Erlang code.
 %%--------------------------------------------------------------------
 %% Definitions
 %%--------------------------------------------------------------------
+-type input() :: [input_elem()].
+-type input_elem() :: token() | {'$end', pos()}.
+-type token() :: eterminfo_strcap_scanner:token().
+-type pos() :: eterminfo_strcap_scanner:pos().
+
+-type parsed() :: pstr() | pfun().
+-type pstr() :: [parsed_elem()].
+-type parsed_elem() :: char() | {pad, eterminfo_strcap_scanner:pad_info()}.
+-type pfun() :: fun((static_vars()) -> pstr()) % 0..9 parameters
+              | fun((param(), static_vars()) -> pstr())
+              | fun((param(), param(), static_vars()) -> pstr())
+              | fun((param(), param(), param(), static_vars()) -> pstr())
+              | fun((param(), param(), param(), param(), static_vars()) ->
+                        pstr())
+              | fun((param(), param(), param(), param(), param(),
+                     static_vars()) ->
+                        pstr())
+              | fun((param(), param(), param(), param(), param(), param(),
+                     static_vars()) ->
+                        pstr())
+              | fun((param(), param(), param(), param(), param(), param(),
+                     param(), static_vars()) ->
+                        pstr())
+              | fun((param(), param(), param(), param(), param(), param(),
+                     param(), param(), static_vars()) ->
+                        pstr())
+              | fun((param(), param(), param(), param(), param(), param(),
+                     param(), param(), param(), static_vars()) ->
+                        pstr()).
+-type static_vars() :: #{var() => value()}.
+-type var() :: string(). % single-letter variable name, upper-case
+-type value() :: integer(). % | string() ?
+-type param() :: integer(). % | string() ?
+
+%% ir = intermediary representation
+-type parsed_ir() :: [parsed_ir_elem()].
+-type parsed_ir_elem() :: char()
+                        | {push, eterminfo_strcap_scanner:push()}
+                        | {pop, eterminfo_strcap_scanner:pop()}
+                        | {pad, eterminfo_strcap_scanner:pad_info()}
+                        | eterminfo_strcap_scanner:unary_op()
+                        | eterminfo_strcap_scanner:binary_op()
+                        | if_expr().
+-type if_expr() :: {'if', Cond::parsed_ir(),
+                    {then, parsed_ir()},
+                    {else, parsed_ir() | if_expr()}}.
+
+-define(is_end(Rest),
+        ((Rest == []) orelse (element(1, hd(Rest)) == '$end'))).
 
 %%--------------------------------------------------------------------
 %% Records
@@ -99,52 +108,107 @@ Erlang code.
 %% Code
 %%--------------------------------------------------------------------
 
+-spec parse(input()) -> {ok, parsed()} | {error, term()}.
+parse(Tokens) ->
+    case p2(Tokens, []) of
+        {Parsed, Rest} when ?is_end(Rest) ->
+            {ok, finalize(Parsed)};
+        X ->
+            {error, X}
+    end.
+
+-spec p2(input(), parsed()) -> {parsed_ir(), input()}.
+p2([Token | Rest], Acc) ->
+    case Token of
+        {char, _Pos, _C}  -> p2(Rest, [mk_char(Token) | Acc]);
+        {pad, _Pos, _Pad} -> p2(Rest, [mk_pad(Token) | Acc]);
+        {push, _Pos, _X}  -> p2(Rest, [mk_push(Token) | Acc]);
+        {pop, _Pos, _X}   -> p2(Rest, [mk_pop(Token) | Acc]);
+        {op1, _Pos, _X}   -> p2(Rest, [mk_unary_op(Token) | Acc]);
+        {op2, _Pos, _X}   -> p2(Rest, [mk_binary_op(Token) | Acc]);
+        {'if', _Pos} when ?is_end(Rest)->
+            %% In wy350, the is3 str capability ends with just "%?".
+            %% The ncurses tparm() renders this as if there was no "%?" at all.
+            {lists:reverse(Acc), Rest};
+        {'if', _Pos} ->
+            {Expr, Rest2} = p2_if_then_else(Rest),
+            p2(Rest2, [Expr | Acc]);
+        _Other -> {lists:reverse(Acc), [Token | Rest]}
+    end;
+p2([], Acc) ->
+    {lists:reverse(Acc), []}.
+
+p2_if_then_else(Tokens) ->
+    case p2(Tokens, []) of
+        {Condition, [{then, _Pos1} | Rest1]} ->
+            p2_then_else(Condition, Rest1)
+    end.
+
+p2_then_else(Condition, Rest) ->
+    case p2(Rest, []) of
+        {Then, [{endif, _Pos} | Rest1]} ->
+            Expr = mk_if(Condition, Then),
+            {Expr, Rest1};
+        {Then, [{else, _Pos} | Rest1]} ->
+            case p2(Rest1, []) of
+                {Else, [{endif, _Pos2} | Rest2]} ->
+                    Expr = mk_if(Condition, Then, Else),
+                    {Expr, Rest2};
+                {Cond2, [{then, _Pos2} | Rest2]} ->
+                    {Elseif, Rest3} = p2_then_else(Cond2, Rest2),
+                    Expr = mk_if(Condition, Then, Elseif),
+                    {Expr, Rest3};
+                {Else, Rest2} when ?is_end(Rest2) ->
+                    %% tw52 is missing the endif token ("%;") after an else
+                    Expr = mk_if(Condition, Then, Else),
+                    {Expr, Rest2}
+            end
+    end.
+
 mk_char({char, _YYline, C})      -> C.
-mk_chars({chars, _YYline, Cs})   -> Cs.
 mk_pad({pad, _YYline, PadInfo})  -> {pad, PadInfo}.
 mk_push({push, _YYline, What})   -> {push, What}.
 mk_pop({pop, _YYline, What})     -> {pop, What}.
 mk_unary_op({op1, _YYline, Op})  -> Op.
 mk_binary_op({op2, _YYline, Op}) -> Op.
-mk_if(Cond, Then)                -> {'if', Cond, {then,Then}, {else,{}}}.
-mk_if(Cond, Then, Else)          -> {'if', Cond, {then,Then}, Else}.
-mk_else(Else)                    -> {else, Else}.
+mk_if(Cond, Then)                -> mk_if(Cond, Then, []).
+mk_if(Cond, Then, Else)          -> {'if', Cond, {then,Then}, {else, Else}}.
 
-
-finalize(PTree) ->
-    case deep_char_list_or_padding(PTree) of
+-spec finalize(parsed_ir()) -> parsed().
+finalize(Parsed) ->
+    case deep_char_list_or_padding(Parsed) of
         true ->
-            ensure_flatlist(PTree);
+            ensure_flatlist(Parsed);
         false ->
-            PTree1 = ensure_flatlist(PTree),
-            case get_param_max(PTree1) of
-                0 -> fun(SVs) -> eval_ptree({},SVs,PTree1) end;
-                1 -> fun(A,SVs) -> eval_ptree({A},SVs,PTree1) end;
-                2 -> fun(A,B,SVs) -> eval_ptree({A,B},SVs,PTree1) end;
-                3 -> fun(A,B,C,SVs) -> eval_ptree({A,B,C},SVs,PTree1) end;
-                4 -> fun(A,B,C,D,SVs) -> eval_ptree({A,B,C,D},SVs,PTree1) end;
+            Parsed1 = ensure_flatlist(Parsed),
+            case get_param_max(Parsed1) of
+                0 -> fun(SVs) -> eval_parsed({},SVs,Parsed1) end;
+                1 -> fun(A,SVs) -> eval_parsed({A},SVs,Parsed1) end;
+                2 -> fun(A,B,SVs) -> eval_parsed({A,B},SVs,Parsed1) end;
+                3 -> fun(A,B,C,SVs) -> eval_parsed({A,B,C},SVs,Parsed1) end;
+                4 -> fun(A,B,C,D,SVs) -> eval_parsed({A,B,C,D},SVs,Parsed1) end;
                 5 -> fun(A,B,C,D,E,SVs) ->
-                             eval_ptree({A,B,C,D,E},SVs,PTree1) end;
+                             eval_parsed({A,B,C,D,E},SVs,Parsed1) end;
                 6 -> fun(A,B,C,D,E,F,SVs) ->
-                             eval_ptree({A,B,C,D,E,F},SVs,PTree1) end;
+                             eval_parsed({A,B,C,D,E,F},SVs,Parsed1) end;
                 7 -> fun(A,B,C,D,E,F,G,SVs) ->
-                             eval_ptree({A,B,C,D,E,F,G},SVs,PTree1) end;
+                             eval_parsed({A,B,C,D,E,F,G},SVs,Parsed1) end;
                 8 -> fun(A,B,C,D,E,F,G,H,SVs) ->
-                             eval_ptree({A,B,C,D,E,F,G,H},SVs,PTree1) end;
+                             eval_parsed({A,B,C,D,E,F,G,H},SVs,Parsed1) end;
                 9 -> fun(A,B,C,D,E,F,G,H,I,SVs) ->
-                             eval_ptree({A,B,C,D,E,F,G,H,I},SVs,PTree1) end
+                             eval_parsed({A,B,C,D,E,F,G,H,I},SVs,Parsed1) end
             end
     end.
 
-get_param_max(PTree) ->
-    case lists:flatten(get_pnums(PTree)) of
+get_param_max(Parsed) ->
+    case lists:flatten(get_pnums(Parsed)) of
         [] -> 0;
         L  -> lists:max(L)
     end.
 
-get_pnums([{push,{param,N}} | R])  -> [N | get_pnums(R)];
+get_pnums([{push, {param,N}} | R])  -> [N | get_pnums(R)];
 get_pnums([L | R]) when is_list(L) -> [get_pnums(L) | get_pnums(R)];
-get_pnums([{'if',C,{then,T},{else,E}} | R]) ->
+get_pnums([{'if', C, {then,T}, {else,E}} | R]) ->
     [get_pnums(ensure_flatlist(C)),
      get_pnums(ensure_flatlist(T)),
      get_pnums(ensure_flatlist(E)) | get_pnums(R)];
@@ -153,25 +217,13 @@ get_pnums([_ | R]) ->
 get_pnums([]) ->
     [].
 
--type elem() :: char()
-              | string()
-              | pad().
--type pad() :: {pad, map()}.
-
--record(env,
-        {st :: [elem()],             % stack
-         ps :: #{1..9 => elem()},    % params. Keys are integers 1..9
-         dvs :: #{[char()] => elem()}, % dynamic vars. Keys are "A".."Z"
-         svs :: #{[char()] => elem()}  % static vars. Keys are "A".."Z"
-        }).
-
-eval_ptree(Params0, StatVars, PTree) ->
+eval_parsed(Params0, StatVars, Parsed) ->
     {_, Params} = foldl(fun(V, {K, Ps}) -> {K+1, Ps#{K => V}} end,
                         {1, #{}},
                         tuple_to_list(Params0)),
     DynVars = #{},
     {_St, _Ps, _DVs, _SVs, Acc} =
-        ep(PTree, _Stack = [], Params, DynVars, StatVars, _Acc = []),
+        ep(Parsed, _Stack = [], Params, DynVars, StatVars, _Acc = []),
     _Result = lists:flatten(lists:reverse(Acc)).
 
 ep([{push, {param, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
@@ -255,11 +307,9 @@ eval_if_then_else(Cond, Then, Else, St0, Ps0, DVs0, SVs0, Acc0) ->
         {[H | St1], Ps1, DVs1, SVs1, Acc1} when H /= 0 ->
             Then1 = ensure_flatlist(Then),
             ep(Then1, St1, Ps1, DVs1, SVs1,Acc1);
-        {[0 | St1], Ps1, DVs1, SVs1, Acc1} when Else /= {} ->
+        {[0 | St1], Ps1, DVs1, SVs1, Acc1} ->
             Else1 = ensure_flatlist(Else),
-            ep(Else1, St1, Ps1, DVs1, SVs1,Acc1);
-        {[0 | St1], Ps1, DVs1, SVs1, Acc1} when Else == {} ->
-            {St1, Ps1, DVs1, SVs1, Acc1}
+            ep(Else1, St1, Ps1, DVs1, SVs1,Acc1)
     end.
 
 logeq(V2,   V1) when V2 == V1 -> 1;

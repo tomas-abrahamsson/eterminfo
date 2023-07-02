@@ -1,5 +1,4 @@
 *.beam
-/src/eterminfo_strcap_parser.erl
 /src/eterminfo_strcap_scanner.erl
 /.eunit/*
 /doc/*

@@ -61,7 +61,8 @@ extr_ctrlchar([$\[]) -> 27;
 extr_ctrlchar([$\\]) -> 28;
 extr_ctrlchar([$\]]) -> 29;
 extr_ctrlchar([$^])  -> 30;
-extr_ctrlchar([$_])  -> 31.
+extr_ctrlchar([$_])  -> 31;
+extr_ctrlchar([$?])  -> 127.
 
 extr_oct([O1, O2, O3]) ->
     ((O1 - $0) bsl (3+3)) + ((O2 - $0) bsl 3) + (O3 - $0).

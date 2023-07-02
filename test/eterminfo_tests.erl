@@ -326,6 +326,47 @@ paramstr_if_then_else_test() ->
     "e"   = ElsIf(9, []),
     ok.
 
+paramstr_if_no_then_test() ->
+    {ok, M} = parse_terminfo_str(
+                %% wy350 has an add cap: is3=\E%?
+                %% Like an if clause but neither then nor else?!
+                %% I think it (%?) evaluates to the empty string.
+                ["\tis3=\\E%?,"]),
+    #{is3 := "\e",
+      '$str_literals' := #{is3 := "\e%?"}} = M,
+    ok.
+
+missing_endif_test() ->
+    %% tw52 has this text for the capability 'setf' (set foreground):
+    %% "\\Ec%?%p1%{0}%=%t?%e%p1%{7}%=%t0%e%p1%{15}%=%t7%e%p1%'0'%+%c"
+    %% It is missing the trailing %;
+    %% decomposing:
+    %% "\\Ec"
+    %%   %? %p1%{0}%=           % if (p1 == 0)
+    %%   %t ?                   % then ?
+    %%   %e %p1%{7}%=           % else if (p1 == 7)
+    %%   %t 0                   % then 0
+    %%   %e %p1%{15}%=          % else if (p1 == 15)
+    %%   %t 7                   % then 7
+    %%   %e %p1%'0'%+%c"        % else p1 + '0'
+    {ok, M} = parse_terminfo_str(
+                ["setf=\\Ec"
+                 "%?%p1%{0}%="
+                 "%t?"
+                 "%e%p1%{7}%="
+                 "%t0"
+                 "%e%p1%{15}%="
+                 "%t7"
+                 "%e%p1%'0'%+%c" % The end-if marker %; is missing
+                 "," % infocmp entries always ends with a comma
+                ]),
+    #{setf := Setf,
+      '$str_literals' := #{setf := "\ec"++_}} = M,
+    "\ec?" = Setf(0, #{}),
+    "\ec0" = Setf(7, #{}),
+    "\ec3" = Setf(3, #{}),
+    ok.
+
 file_non_extended_test() ->
     %% From the example in the term(5) man page
     {ok, M} = parse_terminfo_file_from_hexdump(

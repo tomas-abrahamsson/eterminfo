@@ -221,9 +221,6 @@ $(ebin)/%.beam: $(src)/%.erl | $(ebin)
 $(test)/%.beam: $(test)/%.erl | $(ebin)
 	$(ERLC) $(ERLC_FLAGS) $(EUNIT_ERLC_FLAGS) -pa $(ebin) -o $(test) $<
 
-$(src)/%.erl: $(src)/%.yrl
-	$(ERLC) -o $(src) $<
-
 $(src)/%.erl: $(src)/%.xrl
 	$(ERLC) -o $(src) $<
 
