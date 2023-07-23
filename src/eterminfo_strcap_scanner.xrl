@@ -71,6 +71,8 @@ Erlang code.
 %% API
 %%--------------------------------------------------------------------
 -export([]).
+-export_type([token/0, pos/0, push/0, pop/0, unary_op/0, binary_op/0,
+              pad_info/0]).
 
 %%--------------------------------------------------------------------
 %% Internal exports
@@ -84,6 +86,41 @@ Erlang code.
 %%--------------------------------------------------------------------
 %% Definitions
 %%--------------------------------------------------------------------
+-type token() :: {char, pos(), char()}
+               | {pad, pos(), pad_info()}
+               | {push, pos, push()}
+               | {push, pos, pop()}
+               | {op1, pos(), unary_op()}
+               | {op2, pos(), binary_op()}
+               | {'if', pos()}
+               | {then, pos()}
+               | {else, pos()}
+               | {endif, pos()}.
+-type pos() :: non_neg_integer(). % line number
+-type pad_info() :: #{delay := non_neg_integer(),
+                      proportional := boolean(),
+                      mandatory := boolean()}.
+-type push() :: {param, 1..9}
+              | {dyn_var, var()}
+              | {stat_var, var()}
+              | {int, integer()}.
+-type pop() :: {printf, fmt()}
+             | as_char
+             | as_string
+             | {dyn_var, var()}
+             | {stat_var, var()}.
+-type var() :: string(). % one-letter strings, case matters
+-type fmt() :: {colon(), flags(), width(), precision(), convtype()}.
+-type colon() :: boolean().
+-type flags() :: [$- | $+ | $# | $\s].
+-type width() :: no_width | non_neg_integer().
+-type precision() :: no_precision | non_neg_integer().
+-type convtype() :: dec | oct | hex_lc | hex_uc | str.
+-type unary_op() :: strlen | bitnot | lognot | incr.
+-type binary_op() :: add | sub | mul | 'div' | 'mod'
+                   | bitand | bitor | bitxor
+                   | logand | logor
+                   | eq | lt | gt.
 
 %%--------------------------------------------------------------------
 %% Records
