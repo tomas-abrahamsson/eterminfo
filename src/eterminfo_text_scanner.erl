@@ -19,7 +19,7 @@
 %%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 %%% MA  02110-1301  USA
 
--module(eterminfo_infocmp_scanner).
+-module(eterminfo_text_scanner).
 
 -export([string/1]).
 

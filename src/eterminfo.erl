@@ -300,7 +300,7 @@ setup_by_infocmp(TermType, Opts) ->
         Program ->
             case run_infocmp(Program, ProgOpts ++ [TermType]) of
                 {ok, TermInfoStr} ->
-                    case eterminfo_infocmp_parser:string(TermInfoStr) of
+                    case eterminfo_text_parser:string(TermInfoStr) of
                         {ok, _TermInfoM} = Result ->
                             Result;
                         {error, Reason} ->

@@ -17,7 +17,7 @@
 %%% Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 %%% MA  02110-1301  USA
 
--module(eterminfo_infocmp_parser).
+-module(eterminfo_text_parser).
 -export([string/1]).
 
 -import(lists, [flatten/1, reverse/1]).
@@ -136,7 +136,7 @@ parse_terminfo_string(S) ->
             end;
         {ok, Key, "="++Rest} ->
             AKey = list_to_atom(Key),
-            CapStr = eterminfo_infocmp_scanner:string(Rest),
+            CapStr = eterminfo_text_scanner:string(Rest),
             case eterminfo_strcap_scanner:string(CapStr) of
                 {ok, Tokens, EndLine} ->
                     EndToken = {'$end', EndLine},
