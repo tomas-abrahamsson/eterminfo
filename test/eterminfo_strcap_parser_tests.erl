@@ -88,6 +88,14 @@ paramstr_str_formatting_test() ->
     ">0XC0  <" = X23(192, #{}),
     ">377 <"   = O1(255, #{}),
     ">abc <"   = S1("abc", #{}),
+    %% Invalid type: coerce it to 0 or to the empty string
+    %% (I think this is what ncurses does)
+    "> 0<"     = D1("a", #{}),
+    ">    <"   = S1(0, #{}),
+    %% Stack underflow: treat it as if we had popped a 0 or empty string
+    %% (I think this is what ncurses does)
+    X2 = parse_str("%p1%c >%2d< >%-4s<"),
+    "A > 0< >    <" = X2($A, #{}),
     ok.
 
 paramstr_dyn_var_test() ->
@@ -111,6 +119,14 @@ paramstr_strlen_op_test() ->
     L = parse_str("%p1%l%d"),
     "6" = L("abcdef", #{}),
     "7" = L("abcdefg", #{}),
+    %% Invalid type for strlen: coerce to the empty string:
+    %% (I think this is what ncurses does)
+    L2 = parse_str("%p1%c%{0}%l%d"),
+    "A0" = L2($A, #{}),
+    %% Stack underflow: use the empty string instead
+    %% (I think this is what ncurses does)
+    L3 = parse_str("%p1%c%l%d"),
+    "B0" = L3($B, #{}),
     ok.
 
 paramstr_bin_arith_op_test() ->
@@ -119,13 +135,58 @@ paramstr_bin_arith_op_test() ->
     AMul = parse_str("%p1%p2%*%d"),
     ADiv = parse_str("%p1%p2%/%d"),
     AMod = parse_str("%p1%p2%m%d"),
-    AInc = parse_str("%i%p1%d%p2%d"),
     "3"  = AAdd(1, 2, #{}),
     "4"  = ASub(6, 2, #{}),
     "12" = AMul(6, 2, #{}),
     "4" = ADiv(8, 2, #{}),
+    "0" = ADiv(8, 0, #{}), % division by zero -> 0: this is what ncurses does
     "1" = AMod(13, 3, #{}),
-    "95" = AInc(8, 4, #{}),
+    %% Invalid types for binary op: coerce to 0
+    %% (think this is what ncurses does)
+    "2" = AAdd("a", 2, #{}),
+    "2" = AAdd(2, "a", #{}),
+    "-2" = ASub("a", 2, #{}),
+    "2"  = ASub(2, "a", #{}),
+    "0" = AMul("a", 2, #{}),
+    "0"  = AMul(2, "a", #{}),
+    "0" = ADiv("a", 2, #{}),
+    "0" = ADiv(2, "a", #{}), % division by zero -> 0
+    "0" = AMod("a", 2, #{}),
+    "0" = AMod(2, "a", #{}), % division by zero -> 0
+    %% Stack underflow: do as if we would have popped zeros
+    AAdd1 = parse_str("%p1%c%p2%c%{2}%+%d"),
+    AAdd2 = parse_str("%p1%c%p2%c%+%d"),
+    "AB2" = AAdd1($A, $B, #{}),
+    "AB0" = AAdd2($A, $B, #{}),
+    ASub1 = parse_str("%p1%c%p2%c%{2}%-%d"),
+    ASub2 = parse_str("%p1%c%p2%c%-%d"),
+    "AB-2" = ASub1($A, $B, #{}), % as if we had calculated 0 - 2
+    "AB0"  = ASub2($A, $B, #{}),
+    AMul1 = parse_str("%p1%c%p2%c%{2}%*%d"),
+    AMul2 = parse_str("%p1%c%p2%c%*%d"),
+    "AB0" = AMul1($A, $B, #{}),
+    "AB0" = AMul2($A, $B, #{}),
+    ADiv1 = parse_str("%p1%c%p2%c%{2}%/%d"),
+    ADiv2 = parse_str("%p1%c%p2%c%/%d"),
+    "AB0" = ADiv1($A, $B, #{}),
+    "AB0" = ADiv2($A, $B, #{}), % division by zero -> 0
+    AMod1 = parse_str("%p1%c%p2%c%{2}%/%d"),
+    AMod2 = parse_str("%p1%c%p2%c%/%d"),
+    "AB0" = AMod1($A, $B, #{}),
+    "AB0" = AMod2($A, $B, #{}), % division by zero -> 0
+    ok.
+
+paramstr_inc_params_1_and_2_test() ->
+    AInc1 = parse_str("%i%p1%d%p2%d"),
+    "95" = AInc1(8, 4, #{}),
+    %% Only one param (not an error)
+    AInc2 = parse_str("%i%p1%d"),
+    "9" = AInc2(8, #{}),
+    AInc3 = parse_str("%i%p2%d"),
+    "5" = AInc3(8, 4, #{}),
+    %% Increase only those of param1,2 that are integers
+    AInc4 = parse_str("%i%p1%d%p2%s"),
+    "9abc" = AInc4(8, "abc", #{}),
     ok.
 
 paramstr_bit_op_test() ->
@@ -137,6 +198,31 @@ paramstr_bit_op_test() ->
     "7"  = BOr(6, 3, #{}),
     "5"  = BXor(6, 3, #{}),
     "-7" = BNot(6, #{}), %% FIXME: is this correct?
+    %% Invalid types for bit op: coerce to 0
+    %% (I think this is what ncurses does)
+    "0" = BAnd("a", 2, #{}),
+    "0" = BAnd(2, "a", #{}),
+    "2" = BOr("a", 2, #{}),
+    "2" = BOr(2, "a", #{}),
+    "2" = BXor("a", 2, #{}),
+    "2" = BXor(2, "a", #{}),
+    "-1" = BNot("a", #{}), % FIXME: is this correct?
+    %% Stack underflow: do as if we would have popped zeros
+    %% (I think this is what ncurses does)
+    BAnd1 = parse_str("%p1%c%p2%c%{2}%&%d"),
+    BAnd2 = parse_str("%p1%c%p2%c%&%d"),
+    "AB0" = BAnd1($A, $B, #{}),
+    "AB0" = BAnd2($A, $B, #{}),
+    BOr1  = parse_str("%p1%c%p2%c%{2}%|%d"),
+    BOr2  = parse_str("%p1%c%p2%c%|%d"),
+    "AB2" = BOr1($A, $B, #{}),
+    "AB0" = BOr2($A, $B, #{}),
+    BXor1 = parse_str("%p1%c%p2%c%{2}%^%d"),
+    BXor2 = parse_str("%p1%c%p2%c%^%d"),
+    "AB2" = BXor1($A, $B, #{}),
+    "AB0" = BXor2($A, $B, #{}),
+    BNot1 = parse_str("%p1%c%p2%c%~%d"),
+    "AB-1" = BNot1($A, $B, #{}),
     ok.
 
 paramstr_logical_op_test() ->
@@ -153,6 +239,26 @@ paramstr_logical_op_test() ->
 
     "1"  = LNot(0, #{}),
     "0"  = LNot(1, #{}),
+
+    %% Invalid types for logical op: coerce to 0
+    %% (I think this is what ncurses does)
+    "0"  = LAnd("a", 0, #{}),
+    "0"  = LAnd(1, "a", #{}),
+    "0"  = LOr("a", 0, #{}),
+    "1"  = LOr(1, "a", #{}),
+    "1"  = LNot("a", #{}),
+    %% Stack underflow: do as if we would have popped zeros
+    %% (I think this is what ncurses does)
+    LAnd1 = parse_str("%p1%c%p2%c%{2}%A%d"),
+    LAnd2 = parse_str("%p1%c%p2%c%A%d"),
+    "AB0" = LAnd1($A, $B, #{}),
+    "AB0" = LAnd2($A, $B, #{}),
+    LOr1  = parse_str("%p1%c%p2%c%{2}%O%d"),
+    LOr2  = parse_str("%p1%c%p2%c%O%d"),
+    "AB1" = LOr1($A, $B, #{}),
+    "AB0" = LOr2($A, $B, #{}),
+    LNot1 = parse_str("%p1%c%p2%c%!%d"),
+    "AB1" = LNot1($A, $B, #{}),
     ok.
 
 paramstr_cmp_op_test() ->
@@ -171,6 +277,29 @@ paramstr_cmp_op_test() ->
     "1"  = EQ(0, 0, #{}),
     "1"  = EQ(1, 1, #{}),
     "0"  = EQ(2, 3, #{}),
+
+    %% Invalid types for logical op: coerce to 0
+    %% (I think this is what ncurses does)
+    "1"  = LT("a", 1, #{}),
+    "0"  = LT(0, "a", #{}),
+    "0"  = GT("a", 0, #{}),
+    "1"  = GT(1, "a", #{}),
+    "1"  = EQ("a", 0, #{}),
+    "0"  = EQ(1, "a", #{}),
+    %% Stack underflow: do as if we would have popped zeros
+    %% (I think this is what ncurses does)
+    LT1 = parse_str("%p1%c%p2%c%{2}%<%d"),
+    LT2 = parse_str("%p1%c%p2%c%<%d"),
+    "AB1" = LT1($A, $B, #{}), % as if calculated 0 < 2
+    "AB0" = LT2($A, $B, #{}),
+    GT1  = parse_str("%p1%c%p2%c%{2}%>%d"),
+    GT2  = parse_str("%p1%c%p2%c%>%d"),
+    "AB0" = GT1($A, $B, #{}),
+    "AB0" = GT2($A, $B, #{}),
+    EQ1 = parse_str("%p1%c%p2%c%{2}%=%d"),
+    EQ2 = parse_str("%p1%c%p2%c%=%d"),
+    "AB0" = EQ1($A, $B, #{}),
+    "AB1" = EQ2($A, $B, #{}),
     ok.
 
 paramstr_if_then_else_test() ->

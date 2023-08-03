@@ -243,52 +243,75 @@ ep([{push, {stat_var, K}} | Rest], St, Ps, DVs, SVs, Acc) ->
     end;
 ep([{push, {int, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
     ep(Rest, [N | St], Ps, DVs, SVs, Acc);
-ep([{pop, as_char} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, SVs, [V | Acc]);
-ep([{pop, as_string} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, SVs, [V | Acc]);
-ep([{pop, {printf, FmtInfo}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, SVs, [printf_format(FmtInfo,V) | Acc]);
-ep([{pop, {dyn_var, K}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs#{K => V}, SVs, Acc);
-ep([{pop, {stat_var, K}} | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, SVs#{K => V}, Acc);
-ep([strlen | Rest], [V | St], Ps, DVs, SVs, Acc) ->
-    if is_integer(V) -> ep(Rest, [1 | St], Ps, DVs, SVs, Acc);
-       is_list(V)    -> ep(Rest, [length(V) | St], Ps, DVs, SVs, Acc)
+ep([{pop, as_char} | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_number(Stack),
+    ep(Rest, Stack1, Ps, DVs, SVs, [V | Acc]);
+ep([{pop, as_string} | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_string(Stack),
+    ep(Rest, Stack1, Ps, DVs, SVs, [V | Acc]);
+ep([{pop, {printf, FmtInfo}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_elem(Stack),
+    ep(Rest, Stack1, Ps, DVs, SVs, [printf_format(FmtInfo,V) | Acc]);
+ep([{pop, {dyn_var, K}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_elem(Stack),
+    ep(Rest, Stack1, Ps, DVs#{K => V}, SVs, Acc);
+ep([{pop, {stat_var, K}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_elem(Stack),
+    ep(Rest, Stack1, Ps, DVs, SVs#{K => V}, Acc);
+ep([strlen | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V, Stack1} = pop_string(Stack),
+    ep(Rest, [length(V) | Stack1], Ps, DVs, SVs, Acc);
+ep([add | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [V1 + V2 | Stack1], Ps, DVs, SVs, Acc);
+ep([sub | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [V1 - V2 | Stack1], Ps, DVs, SVs, Acc);
+ep([mul | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [V1 * V2 | Stack1], Ps, DVs, SVs, Acc);
+ep(['div' | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    if V2 /= 0 -> ep(Rest, [(V1 div V2) | Stack1], Ps, DVs, SVs, Acc);
+       V2 == 0 -> ep(Rest, [0 | Stack1], Ps, DVs, SVs, Acc)
     end;
-ep([add | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [V2 + V1 | St], Ps, DVs, SVs, Acc);
-ep([sub | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [V2 - V1 | St], Ps, DVs, SVs, Acc);
-ep([mul | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [V2 * V1 | St], Ps, DVs, SVs, Acc);
-ep(['div' | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(V2 div V1) | St], Ps, DVs, SVs, Acc);
-ep([mod | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(V2 rem V1) | St], Ps, DVs, SVs, Acc);
-ep([bitand | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(V2 band V1) | St], Ps, DVs, SVs, Acc);
-ep([bitor | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(V2 bor V1) | St], Ps, DVs, SVs, Acc);
-ep([bitxor | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(V2 bxor V1) | St], Ps, DVs, SVs, Acc);
-ep([eq | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [logeq(V2, V1) | St], Ps, DVs, SVs, Acc);
-ep([lt | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [loglt(V2, V1) | St], Ps, DVs, SVs, Acc);
-ep([gt | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [loggt(V2, V1) | St], Ps, DVs, SVs, Acc);
-ep([logand | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [logand(V2, V1) | St], Ps, DVs, SVs, Acc);
-ep([logor | Rest], [V1, V2 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [logor(V2, V1) | St], Ps, DVs, SVs, Acc);
-ep([lognot | Rest], [V1 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [lognot(V1) | St], Ps, DVs, SVs, Acc);
-ep([bitnot | Rest], [V1 | St], Ps, DVs, SVs, Acc) ->
-    ep(Rest, [(bnot V1) | St], Ps, DVs, SVs, Acc);
-ep([incr | Rest], St, Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, incr_first_two_params(Ps), DVs, SVs, Acc);
+ep([mod | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    if V2 /= 0 -> ep(Rest, [(V1 rem V2) | Stack1], Ps, DVs, SVs, Acc);
+       V2 == 0 ->  ep(Rest, [0 | Stack1], Ps, DVs, SVs, Acc)
+    end;
+ep([bitand | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [(V1 band V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([bitor | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [(V1 bor V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([bitxor | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [(V1 bxor V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([eq | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [logeq(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([lt | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [loglt(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([gt | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [loggt(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([logand | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [logand(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([logor | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, V2, Stack1} = pop2_numbers(Stack),
+    ep(Rest, [logor(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
+ep([lognot | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, Stack1} = pop_number(Stack),
+    ep(Rest, [lognot(V1) | Stack1], Ps, DVs, SVs, Acc);
+ep([bitnot | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    {V1, Stack1} = pop_number(Stack),
+    ep(Rest, [(bnot V1) | Stack1], Ps, DVs, SVs, Acc);
+ep([incr | Rest], Stack, Ps, DVs, SVs, Acc) ->
+    ep(Rest, Stack, incr_first_two_params_if_ints(Ps), DVs, SVs, Acc);
 ep([{'if', Cond, {then, Then}, {else, Else}} | Rest], St, Ps, DVs, SVs, Acc) ->
     {St1, Ps1, DVs1, SVs1, Acc1} =
         eval_if_then_else(Cond, Then, Else, St, Ps, DVs, SVs, Acc),
@@ -298,18 +321,49 @@ ep([S | Rest], St, Ps, DVs, SVs, Acc) ->
 ep([], St, Ps, DVs, SVs, Acc) ->
     {St, Ps, DVs, SVs, Acc}.
 
-incr_first_two_params(#{1 := V1, 2 := V2}=Ps) ->
-    Ps#{1 := V1+1,
-        2 := V2+1}.
+incr_first_two_params_if_ints(Ps0) ->
+    Ps1 = case Ps0 of
+              #{1 := V1} when is_integer(V1) -> Ps0#{1 := V1 + 1};
+              #{} -> Ps0
+          end,
+    case Ps1 of
+        #{2 := V2} when is_integer(V2) -> Ps1#{2 := V2 + 1};
+        #{} -> Ps1
+    end.
+
+pop_number([X | RestStack]) -> {coerce_number(X), RestStack};
+pop_number([])              -> {0, []}.
+
+%% Order of elems: calculate 15 mod 4:
+%% assume we've done: push n1, push n2 (n1 = 15, n2=4)
+%% and are about to calculate n1 mod n2
+%% pop2_numbers(Stack) -> {n1, n2, RestStack}
+pop2_numbers(Stack) ->
+    {N2, Stack1} = pop_number(Stack),
+    {N1, Stack2} = pop_number(Stack1),
+    {N1, N2, Stack2}.
+
+pop_string([X | RestStack]) -> {coerce_string(X), RestStack};
+pop_string([])              -> {"", []}.
+
+coerce_number(N) when is_integer(N) -> N;
+coerce_number(_)                    -> 0.
+
+coerce_string(S) when is_list(S) -> S;
+coerce_string(_)                 -> "".
+
+pop_elem([Elem | RestStack]) -> {Elem, RestStack};
+pop_elem([])                 -> {0, []}.
 
 eval_if_then_else(Cond, Then, Else, St0, Ps0, DVs0, SVs0, Acc0) ->
-    case ep(Cond, St0, Ps0, DVs0, SVs0, Acc0) of
-        {[H | St1], Ps1, DVs1, SVs1, Acc1} when H /= 0 ->
+    {Stack1, Ps1, DVs1, SVs1, Acc1} = ep(Cond, St0, Ps0, DVs0, SVs0, Acc0),
+    {H, Stack2} = pop_number(Stack1),
+    if H /= 0 ->
             Then1 = ensure_flatlist(Then),
-            ep(Then1, St1, Ps1, DVs1, SVs1,Acc1);
-        {[0 | St1], Ps1, DVs1, SVs1, Acc1} ->
+            ep(Then1, Stack2, Ps1, DVs1, SVs1,Acc1);
+       H == 0 ->
             Else1 = ensure_flatlist(Else),
-            ep(Else1, St1, Ps1, DVs1, SVs1,Acc1)
+            ep(Else1, Stack2, Ps1, DVs1, SVs1,Acc1)
     end.
 
 logeq(V2,   V1) when V2 == V1 -> 1;
@@ -345,13 +399,14 @@ dclop([])                         -> true.
 
 
 printf_format({_Colon, Flags, Width, Precisison, ConvType}, Value) ->
-    S1 = convert_value(ConvType, Precisison, Value),
+    Value1 = coerce_printf_value(ConvType, Value),
+    S1 = convert_value(ConvType, Precisison, Value1),
 
     S2 = case {lists:member($#, Flags), ConvType} of
-             {true, hex_lc} when is_integer(Value), Value /= 0 -> "0x"++S1;
-             {true, hex_uc} when is_integer(Value), Value /= 0 -> "0X"++S1;
-             {true, oct}    when hd(S1) /= $0                  -> "0"++S1;
-             {_,    _}                                         -> S1
+             {true, hex_lc} when is_integer(Value1), Value1 /= 0 -> "0x"++S1;
+             {true, hex_uc} when is_integer(Value1), Value1 /= 0 -> "0X"++S1;
+             {true, oct}    when hd(S1) /= $0                    -> "0"++S1;
+             {_,    _}                                           -> S1
          end,
 
     S3 = case {lists:member($\s, Flags), ConvType, S2} of
@@ -363,11 +418,11 @@ printf_format({_Colon, Flags, Width, Precisison, ConvType}, Value) ->
              {false, _, _}         -> S2
          end,
 
-    %% Note: if Value is a negative number, S1 will already have a "-" first.
+    %% Note: if Value1 is a negative number, S1 will already have a "-" first.
     S4 = case lists:member($+, Flags) of
-             true when is_integer(Value), Value >= 0 -> "+"++S3;
-             true                                    -> S3;
-             false                                   -> S3
+             true when is_integer(Value1), Value1 >= 0 -> "+"++S3;
+             true                                      -> S3;
+             false                                     -> S3
          end,
 
     S5 = if Width == no_width   -> S4;
@@ -380,6 +435,17 @@ printf_format({_Colon, Flags, Width, Precisison, ConvType}, Value) ->
                  end
          end,
     S5.
+
+coerce_printf_value(ConvType, X) ->
+    GConvType = case ConvType of
+                    str -> str;
+                    _   -> int % there are many types of int
+                end,
+    if GConvType == str, is_list(X) -> X;
+       GConvType == int, is_integer(X) -> X;
+       GConvType == str -> "";
+       GConvType == int -> 0
+    end.
 
 convert_value(str,   no_precision, V) -> convert_value2(str, unlimited, V);
 convert_value(CType, no_precision, V) -> convert_value2(CType, 1, V);
