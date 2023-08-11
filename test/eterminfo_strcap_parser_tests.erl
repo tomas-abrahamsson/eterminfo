@@ -187,6 +187,9 @@ paramstr_inc_params_1_and_2_test() ->
     %% Increase only those of param1,2 that are integers
     AInc4 = parse_str("%i%p1%d%p2%s"),
     "9abc" = AInc4(8, "abc", #{}),
+    %% Increase is only done once:
+    AInc5 = parse_str("%i%i%p1%d"),
+    "6" = AInc5(5, #{}),
     ok.
 
 paramstr_bit_op_test() ->

@@ -220,6 +220,7 @@ eval_parsed(Params0, StaticVars, Parsed) ->
                params => maps:from_list(enumerate(tuple_to_list(Params0))),
                dyn_vars => #{},
                static_vars => StaticVars,
+               incr_done => false,
                %% The result:
                acc => []},
     #{acc := Acc} = ep(Parsed, State0),
@@ -227,6 +228,7 @@ eval_parsed(Params0, StaticVars, Parsed) ->
 
 ep([Elem | Rest], #{stack := Stack, params := Ps,
                     dyn_vars := DVs, static_vars := SVs,
+                    incr_done := IncrDone,
                     acc := Acc}=State) ->
     case Elem of
         {push, {param, N}} ->
@@ -315,7 +317,12 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
             {V1, Stack1} = pop_number(Stack),
             ep(Rest, State#{stack := [(bnot V1) | Stack1]});
         incr ->
-            ep(Rest, State#{params := incr_first_two_params_if_ints(Ps)});
+            if not IncrDone ->
+                    Ps1 = incr_first_two_params_if_ints(Ps),
+                    ep(Rest, State#{params := Ps1, incr_done := true});
+               IncrDone ->
+                    ep(Rest, State)
+            end;
         {'if', Cond, {then, Then}, {else, Else}} ->
             #{stack := Stack1}=State1 = ep(Cond, State),
             {H, Stack2} = pop_number(Stack1),
