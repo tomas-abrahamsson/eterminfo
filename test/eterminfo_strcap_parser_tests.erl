@@ -197,7 +197,7 @@ paramstr_bit_op_test() ->
     "1"  = BAnd(1, 3, #{}),
     "7"  = BOr(6, 3, #{}),
     "5"  = BXor(6, 3, #{}),
-    "-7" = BNot(6, #{}), %% FIXME: is this correct?
+    "-7" = BNot(6, #{}), % treated as a signed value
     %% Invalid types for bit op: coerce to 0
     %% (I think this is what ncurses does)
     "0" = BAnd("a", 2, #{}),
@@ -206,7 +206,7 @@ paramstr_bit_op_test() ->
     "2" = BOr(2, "a", #{}),
     "2" = BXor("a", 2, #{}),
     "2" = BXor(2, "a", #{}),
-    "-1" = BNot("a", #{}), % FIXME: is this correct?
+    "-1" = BNot("a", #{}), % ~0 as a signed value
     %% Stack underflow: do as if we would have popped zeros
     %% (I think this is what ncurses does)
     BAnd1 = parse_str("%p1%c%p2%c%{2}%&%d"),
