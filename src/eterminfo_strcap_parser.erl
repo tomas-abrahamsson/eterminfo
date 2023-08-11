@@ -54,30 +54,34 @@
 -type pos() :: eterminfo_strcap_scanner:pos().
 
 -type parsed() :: pstr() | pfun().
+-type presult() :: pstr() % default
+                   %% If the option return_static_vars is set to true:
+                 | {pstr(), #{static_vars := static_vars()}}.
 -type pstr() :: [parsed_elem()].
 -type parsed_elem() :: char() | {pad, eterminfo_strcap_scanner:pad_info()}.
--type pfun() :: fun((eval_opts()) -> pstr()) % 0..9 parameters
-              | fun((param(), eval_opts()) -> pstr())
-              | fun((param(), param(), eval_opts()) -> pstr())
-              | fun((param(), param(), param(), eval_opts()) -> pstr())
+-type pfun() :: fun((eval_opts()) -> presult()) % 0..9 parameters
+              | fun((param(), eval_opts()) -> presult())
+              | fun((param(), param(), eval_opts()) -> presult())
+              | fun((param(), param(), param(), eval_opts()) -> presult())
               | fun((param(), param(), param(), param(), eval_opts()) ->
-                        pstr())
+                        presult())
               | fun((param(), param(), param(), param(), param(),
                      eval_opts()) ->
-                        pstr())
+                        presult())
               | fun((param(), param(), param(), param(), param(), param(),
                      eval_opts()) ->
-                        pstr())
+                        presult())
               | fun((param(), param(), param(), param(), param(), param(),
                      param(), eval_opts()) ->
-                        pstr())
+                        presult())
               | fun((param(), param(), param(), param(), param(), param(),
                      param(), param(), eval_opts()) ->
-                        pstr())
+                        presult())
               | fun((param(), param(), param(), param(), param(), param(),
                      param(), param(), param(), eval_opts()) ->
-                        pstr()).
--type eval_opts() :: #{static_vars => static_vars()}.
+                        presult()).
+-type eval_opts() :: #{static_vars => static_vars(),
+                       return_static_vars => boolean()}.
 -type static_vars() :: #{var() => value()}.
 -type var() :: string(). % single-letter variable name, upper-case
 -type value() :: integer(). % | string() ?
@@ -237,8 +241,14 @@ eval_parsed(Params0, Parsed, EvalOpts) ->
                incr_done => false,
                %% The result:
                acc => []},
-    #{acc := Acc} = ep(Parsed, State0),
-    lists:flatten(lists:reverse(Acc)).
+    #{acc := Acc, static_vars := StaticOutVars} = ep(Parsed, State0),
+    Res = lists:flatten(lists:reverse(Acc)),
+    case EvalOpts of
+        #{return_static_vars := true} ->
+            {Res, #{static_vars => StaticOutVars}};
+        #{} ->
+            Res
+    end.
 
 ep([Elem | Rest], #{stack := Stack, params := Ps,
                     dyn_vars := DVs, static_vars := SVs,

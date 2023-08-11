@@ -121,6 +121,14 @@ paramstr_static_var_test() ->
     "00" = PP2(#{}),
     ok.
 
+return_static_vars_test() ->
+    PP1 = parse_str("%p1%gA%+%PA"),
+    "" = PP1(1, #{}),
+    {"", #{static_vars := #{"A" := 1}}} = PP1(1, #{return_static_vars => true}),
+    {"", #{static_vars := #{"A" := 4}}} = PP1(1, #{static_vars => #{"A" => 3},
+                                                   return_static_vars => true}),
+    ok.
+
 paramstr_strlen_op_test() ->
     L = parse_str("%p1%l%d"),
     "6" = L("abcdef", #{}),
