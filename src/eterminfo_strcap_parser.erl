@@ -98,7 +98,7 @@
                         | if_expr().
 -type if_expr() :: {'if', Cond::parsed_ir(),
                     {then, parsed_ir()},
-                    {else, parsed_ir() | if_expr()}}.
+                    {else, parsed_ir()}}.
 
 -define(is_end(Rest),
         ((Rest == []) orelse (element(1, hd(Rest)) == '$end'))).
@@ -159,7 +159,7 @@ p2_then_else(Condition, Rest) ->
                     {Expr, Rest2};
                 {Cond2, [{then, _Pos2} | Rest2]} ->
                     {Elseif, Rest3} = p2_then_else(Cond2, Rest2),
-                    Expr = mk_if(Condition, Then, Elseif),
+                    Expr = mk_if(Condition, Then, [Elseif]),
                     {Expr, Rest3};
                 {Else, Rest2} when ?is_end(Rest2) ->
                     %% tw52 is missing the endif token ("%;") after an else
@@ -181,57 +181,51 @@ mk_if(Cond, Then, Else)          -> {'if', Cond, {then,Then}, {else, Else}}.
 finalize(Parsed) ->
     case deep_char_list_or_padding(Parsed) of
         true ->
-            ensure_flatlist(Parsed);
+            Parsed;
         false ->
-            Parsed1 = ensure_flatlist(Parsed),
-            case get_param_max(Parsed1) of
+            case get_param_max(Parsed) of
                 0 -> fun(EvalOpts) ->
-                             eval_parsed({}, Parsed1, EvalOpts)
+                             eval_parsed({}, Parsed, EvalOpts)
                      end;
                 1 -> fun(A, EvalOpts) ->
-                             eval_parsed({A}, Parsed1, EvalOpts) end;
+                             eval_parsed({A}, Parsed, EvalOpts) end;
                 2 -> fun(A,B,EvalOpts) ->
-                             eval_parsed({A, B}, Parsed1, EvalOpts) end;
+                             eval_parsed({A, B}, Parsed, EvalOpts) end;
                 3 -> fun(A,B,C,EvalOpts) ->
-                             eval_parsed({A, B, C}, Parsed1, EvalOpts) end;
+                             eval_parsed({A, B, C}, Parsed, EvalOpts) end;
                 4 -> fun(A,B,C,D,EvalOpts) ->
-                             eval_parsed({A, B, C, D}, Parsed1, EvalOpts) end;
+                             eval_parsed({A, B, C, D}, Parsed, EvalOpts) end;
                 5 -> fun(A,B,C,D,E,EvalOpts) ->
-                             eval_parsed({A, B, C, D, E}, Parsed1, EvalOpts)
+                             eval_parsed({A, B, C, D, E}, Parsed, EvalOpts)
                      end;
                 6 -> fun(A, B, C, D, E, F, EvalOpts) ->
                              eval_parsed({A, B, C, D, E, F},
-                                         Parsed1, EvalOpts) end;
+                                         Parsed, EvalOpts) end;
                 7 -> fun(A, B, C, D, E, F, G, EvalOpts) ->
                              eval_parsed({A, B, C, D, E, F, G},
-                                         Parsed1, EvalOpts) end;
+                                         Parsed, EvalOpts) end;
                 8 -> fun(A, B, C, D, E, F, G, H, EvalOpts) ->
                              eval_parsed({A, B, C, D, E, F, G, H},
-                                         Parsed1, EvalOpts)
+                                         Parsed, EvalOpts)
                      end;
                 9 -> fun(A, B, C, D, E, F, G, H, I, EvalOpts) ->
                              eval_parsed({A, B, C, D, E, F, G, H, I},
-                                         Parsed1, EvalOpts)
+                                         Parsed, EvalOpts)
                      end
             end
     end.
 
 get_param_max(Parsed) ->
-    case lists:flatten(get_pnums(Parsed)) of
-        [] -> 0;
-        L  -> lists:max(L)
-    end.
+    get_pmax(Parsed, 0).
 
-get_pnums([{push, {param,N}} | R])  -> [N | get_pnums(R)];
-get_pnums([L | R]) when is_list(L) -> [get_pnums(L) | get_pnums(R)];
-get_pnums([{'if', C, {then,T}, {else,E}} | R]) ->
-    [get_pnums(ensure_flatlist(C)),
-     get_pnums(ensure_flatlist(T)),
-     get_pnums(ensure_flatlist(E)) | get_pnums(R)];
-get_pnums([_ | R]) ->
-    get_pnums(R);
-get_pnums([]) ->
-    [].
+get_pmax([{push, {param,N}} | Rest], Max)  -> get_pmax(Rest, max(N, Max));
+get_pmax([{'if', Cond, {then,Then}, {else, Else}} | Rest], Max) ->
+    Max1 = lists:foldl(fun get_pmax/2, Max, [Cond, Then, Else]),
+    get_pmax(Rest, Max1);
+get_pmax([_ | Rest], Max) ->
+    get_pmax(Rest, Max);
+get_pmax([], Max) ->
+    Max.
 
 eval_parsed(Params0, Parsed, EvalOpts) ->
     State0 = #{stack => [],
@@ -242,7 +236,7 @@ eval_parsed(Params0, Parsed, EvalOpts) ->
                %% The result:
                acc => []},
     #{acc := Acc, static_vars := StaticOutVars} = ep(Parsed, State0),
-    Res = lists:flatten(lists:reverse(Acc)),
+    Res = lists:reverse(Acc),
     case EvalOpts of
         #{return_static_vars := true} ->
             {Res, #{static_vars => StaticOutVars}};
@@ -273,10 +267,10 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
             ep(Rest, State#{stack := Stack1, acc := [V | Acc]});
         {pop, as_string} ->
             {V, Stack1} = pop_string(Stack),
-            ep(Rest, State#{stack := Stack1, acc := [V | Acc]});
+            ep(Rest, State#{stack := Stack1, acc := lists:reverse(V, Acc)});
         {pop, {printf, FmtInfo}} ->
             {V, Stack1} = pop_elem(Stack),
-            Acc1 = [printf_format(FmtInfo,V) | Acc],
+            Acc1 = lists:reverse(printf_format(FmtInfo,V), Acc),
             ep(Rest, State#{stack := Stack1, acc := Acc1});
         {pop, {dyn_var, K}} ->
             {V, Stack1} = pop_elem(Stack),
@@ -347,8 +341,8 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
             #{stack := Stack1}=State1 = ep(Cond, State),
             {H, Stack2} = pop_number(Stack1),
             State2 = State1#{stack := Stack2},
-            State3 = if H /= 0 -> ep(ensure_flatlist(Then), State2);
-                        H == 0 -> ep(ensure_flatlist(Else), State2)
+            State3 = if H /= 0 -> ep(Then, State2);
+                        H == 0 -> ep(Else, State2)
                      end,
             ep(Rest, State3);
         _ ->
@@ -416,9 +410,6 @@ logor(_V2,_V1)              -> 0.
 
 lognot(V) when V /= 0 -> 0;
 lognot(V) when V == 0 -> 1.
-
-ensure_flatlist(L) when is_list(L) -> lists:flatten(L);
-ensure_flatlist(X)                 -> [X].
 
 deep_char_list_or_padding(L) when is_list(L) -> dclop(L);
 deep_char_list_or_padding(_L)                -> false.
