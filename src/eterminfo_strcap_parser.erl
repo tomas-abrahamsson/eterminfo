@@ -237,15 +237,11 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
                 #{}       -> ep(Rest, State)
             end;
         {push, {dyn_var, K}} ->
-            case DVs of
-                #{K := V} -> ep(Rest, State#{stack := [V | Stack]});
-                #{}       -> ep(Rest, State)
-            end;
+            {V, DVs1} = get_var_or_initialize_to_zero(K, DVs),
+            ep(Rest, State#{stack := [V | Stack], dyn_vars := DVs1});
         {push, {static_var, K}} ->
-            case SVs of
-                #{K := V} -> ep(Rest, State#{stack := [V | Stack]});
-                #{}       -> ep(Rest, State)
-            end;
+            {V, SVs1} = get_var_or_initialize_to_zero(K, SVs),
+            ep(Rest, State#{stack := [V | Stack], static_vars := SVs1});
         {push, {int, N}} ->
             ep(Rest, State#{stack := [N | Stack]});
         {pop, as_char} ->
@@ -336,6 +332,12 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
     end;
 ep([], State) ->
     State.
+
+get_var_or_initialize_to_zero(K, Vars) ->
+    case maps:find(K, Vars) of
+        {ok, V} -> {V, Vars};
+        error   -> {0, Vars#{K => 0}}
+    end.
 
 incr_first_two_params_if_ints(Ps0) ->
     Ps1 = case Ps0 of
