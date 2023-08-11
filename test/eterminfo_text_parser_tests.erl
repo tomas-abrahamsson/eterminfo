@@ -102,6 +102,73 @@ bitwise_xor_does_not_start_control_char_test() ->
     "X4" = Bitxor(#{}),
     ok.
 
+multiline_str_cap_test() ->
+    %% From the terminfo(5) map page in ncurses 6.4:
+    %%
+    %%   "String capabilities can be split into multiple lines, just
+    %%    as the fields comprising a terminal entry can be split into
+    %%    multiple lines.  While blanks between fields are ignored,
+    %%    blanks embedded within a string value are retained, except
+    %%    for leading blanks on a line."
+    %%
+    %% For examples of such multi-line entries, run infocmp -1 -f on a
+    %% a sufficiently complex term, such as xterm. It gets indented with
+    %% several TAB characters.
+    #{'$str_literals' := #{multiline := "mab"},
+      multiline := "mab"} =
+        parse_str_full(["#\tComment",
+                        "dummyname|dummydescr,",
+                        "\tmultiline=m", % <- does not end with comma
+                        "\t\ta",
+                        "\t\tb,"]), % <- here is the terminating comma
+    %% Something more complex from a real entry:
+    #{'$str_literals' := #{initc := ("\e]4;"
+                                     "%p1%d;rgb:"
+                                     "%p2%{255}%*%{1000}%/%2.2X/"
+                                     "%p3%{255}%*%{1000}%/%2.2X/"
+                                     "%p4%{255}%*%{1000}%/%2.2X\e\\"),
+                           setaf := ("\e["
+                                     "%?"
+                                     ""    "%p1%{8}%<"
+                                     ""    "%t3"
+                                     ""    "%p1%d"
+                                     "%e"
+                                     ""    "%p1%{16}%<"
+                                     ""    "%t9"
+                                     ""    "%p1%{8}%-%d"
+                                     "%e38;5;"
+                                     ""    "%p1%d"
+                                     "%;"
+                                     "m")},
+      initc := Initc,
+      setaf := SetAF} =
+        parse_str_full(["#\tComment",
+                        "dummyname|alias|description,",
+                        "\tinitc=\\E]4;",
+                        "\t\t%p1%d;rgb:",
+                        "\t\t%p2%{255}%*%{1000}%/%2.2X/",
+                        "\t\t%p3%{255}%*%{1000}%/%2.2X/",
+                        "\t\t%p4%{255}%*%{1000}%/%2.2X\\E\\\\,",
+                        "\ts=x,",
+                        "\tsetaf=\\E[",
+                        "\t\t%?",
+                        "\t\t\t%p1%{8}%<",
+                        "\t\t\t%t3",
+                        "\t\t\t%p1%d",
+                        "\t\t%e",
+                        "\t\t\t%p1%{16}%<",
+                        "\t\t\t%t9",
+                        "\t\t\t%p1%{8}%-%d",
+                        "\t\t%e38;5;",
+                        "\t\t\t%p1%d",
+                        "\t\t%;",
+                        "\t\tm,"]),
+    "\e]4;1;rgb:FF/7F/3F\e\\" = Initc(1, 1000, 500, 250, #{}),
+    "\e[31m"      = SetAF(1, #{}),
+    "\e[91m"      = SetAF(9, #{}),
+    "\e[38;5;17m" = SetAF(17, #{}),
+    ok.
+
 parse_simple(CapabilityText) ->
     parse_str(["\t" ++ CapabilityText ++ ","]).
 

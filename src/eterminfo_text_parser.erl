@@ -121,8 +121,18 @@ read_until_comma("^\\"++T, Acc)    -> read_until_comma(T, [$\\, $^ | Acc]);
 read_until_comma("\\"++[C|T], Acc) -> read_until_comma(T, [C, $\\ | Acc]);
 read_until_comma(","++Rest, Acc)   -> {ok, flatten(reverse(Acc)), Rest};
 read_until_comma([eof], _Acc)      -> eof_seen;
+read_until_comma("\n"++Rest, Acc)  -> multiline_skip_leading_space(Rest, Acc);
 read_until_comma([C | Rest], Acc)  -> read_until_comma(Rest, [C | Acc]);
 read_until_comma("", _Acc)         -> need_more.
+
+multiline_skip_leading_space([C | Rest]=Str, Acc) ->
+    case C of
+        $\t -> multiline_skip_leading_space(Rest, Acc);
+        $\s -> multiline_skip_leading_space(Rest, Acc);
+        _   -> read_until_comma(Str, Acc)
+    end;
+multiline_skip_leading_space("", _Acc) ->
+    need_more.
 
 parse_terminfo_string(S) ->
     case read_terminfo_key(S) of
