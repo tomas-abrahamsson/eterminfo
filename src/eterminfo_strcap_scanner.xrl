@@ -54,7 +54,7 @@ Rules.
 \%i  :         {token, {op1,  TokenLine, incr}}.
 \%\? :         {token, {'if', TokenLine}}.
 \%t  :         {token, {then, TokenLine}}.
-\%e  :         {token, {else, TokenLine}}.
+\%e  :         {token, {'else', TokenLine}}.
 \%;  :         {token, {endif,TokenLine}}.
 
 \$<[0-9]+[*/]?[*/]?> :
@@ -94,7 +94,7 @@ Erlang code.
                | {op2, pos(), binary_op()}
                | {'if', pos()}
                | {then, pos()}
-               | {else, pos()}
+               | {'else', pos()}
                | {endif, pos()}.
 -type pos() :: non_neg_integer(). % line number
 -type pad_info() :: #{delay := non_neg_integer(),

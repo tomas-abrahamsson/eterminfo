@@ -98,7 +98,7 @@
                         | if_expr().
 -type if_expr() :: {'if', Cond::parsed_ir(),
                     {then, parsed_ir()},
-                    {else, parsed_ir()}}.
+                    {'else', parsed_ir()}}.
 
 -define(is_end(Rest),
         ((Rest == []) orelse (element(1, hd(Rest)) == '$end'))).
@@ -152,7 +152,7 @@ p2_then_else(Condition, Rest) ->
         {Then, [{endif, _Pos} | Rest1]} ->
             Expr = mk_if(Condition, Then),
             {Expr, Rest1};
-        {Then, [{else, _Pos} | Rest1]} ->
+        {Then, [{'else', _Pos} | Rest1]} ->
             case p2(Rest1, []) of
                 {Else, [{endif, _Pos2} | Rest2]} ->
                     Expr = mk_if(Condition, Then, Else),
@@ -175,7 +175,7 @@ mk_pop({pop, _YYline, What})     -> {pop, What}.
 mk_unary_op({op1, _YYline, Op})  -> Op.
 mk_binary_op({op2, _YYline, Op}) -> Op.
 mk_if(Cond, Then)                -> mk_if(Cond, Then, []).
-mk_if(Cond, Then, Else)          -> {'if', Cond, {then,Then}, {else, Else}}.
+mk_if(Cond, Then, Else)          -> {'if', Cond, {then,Then}, {'else', Else}}.
 
 -spec finalize(parsed_ir()) -> parsed().
 finalize(Parsed) ->
@@ -219,7 +219,7 @@ get_param_max(Parsed) ->
     get_pmax(Parsed, 0).
 
 get_pmax([{push, {param,N}} | Rest], Max)  -> get_pmax(Rest, max(N, Max));
-get_pmax([{'if', Cond, {then,Then}, {else, Else}} | Rest], Max) ->
+get_pmax([{'if', Cond, {then,Then}, {'else', Else}} | Rest], Max) ->
     Max1 = lists:foldl(fun get_pmax/2, Max, [Cond, Then, Else]),
     get_pmax(Rest, Max1);
 get_pmax([_ | Rest], Max) ->
@@ -337,7 +337,7 @@ ep([Elem | Rest], #{stack := Stack, params := Ps,
                IncrDone ->
                     ep(Rest, State)
             end;
-        {'if', Cond, {then, Then}, {else, Else}} ->
+        {'if', Cond, {then, Then}, {'else', Else}} ->
             #{stack := Stack1}=State1 = ep(Cond, State),
             {H, Stack2} = pop_number(Stack1),
             State2 = State1#{stack := Stack2},
