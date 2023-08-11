@@ -115,7 +115,7 @@ paramstr_static_var_test() ->
     %% same as dyn var, but with a static var
     %% (uppercase A means static var instead of dynamic)
     PP1 = parse_str("%p1%Pa%p2%PA%gA%d-%ga%d-%gC%d"),
-    "3-4-5" = PP1(4, 3, #{"C" => 5}),
+    "3-4-5" = PP1(4, 3, #{static_vars => #{"C" => 5}}),
     %% "ncurses zeros dynamic variables before the first %g or %P operator."
     PP2 = parse_str("%gA%d%gA%d"),
     "00" = PP2(#{}),

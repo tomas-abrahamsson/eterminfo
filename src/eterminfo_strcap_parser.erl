@@ -56,27 +56,28 @@
 -type parsed() :: pstr() | pfun().
 -type pstr() :: [parsed_elem()].
 -type parsed_elem() :: char() | {pad, eterminfo_strcap_scanner:pad_info()}.
--type pfun() :: fun((static_vars()) -> pstr()) % 0..9 parameters
-              | fun((param(), static_vars()) -> pstr())
-              | fun((param(), param(), static_vars()) -> pstr())
-              | fun((param(), param(), param(), static_vars()) -> pstr())
-              | fun((param(), param(), param(), param(), static_vars()) ->
+-type pfun() :: fun((eval_opts()) -> pstr()) % 0..9 parameters
+              | fun((param(), eval_opts()) -> pstr())
+              | fun((param(), param(), eval_opts()) -> pstr())
+              | fun((param(), param(), param(), eval_opts()) -> pstr())
+              | fun((param(), param(), param(), param(), eval_opts()) ->
                         pstr())
               | fun((param(), param(), param(), param(), param(),
-                     static_vars()) ->
+                     eval_opts()) ->
                         pstr())
               | fun((param(), param(), param(), param(), param(), param(),
-                     static_vars()) ->
+                     eval_opts()) ->
                         pstr())
               | fun((param(), param(), param(), param(), param(), param(),
-                     param(), static_vars()) ->
+                     param(), eval_opts()) ->
                         pstr())
               | fun((param(), param(), param(), param(), param(), param(),
-                     param(), param(), static_vars()) ->
+                     param(), param(), eval_opts()) ->
                         pstr())
               | fun((param(), param(), param(), param(), param(), param(),
-                     param(), param(), param(), static_vars()) ->
+                     param(), param(), param(), eval_opts()) ->
                         pstr()).
+-type eval_opts() :: #{static_vars => static_vars()}.
 -type static_vars() :: #{var() => value()}.
 -type var() :: string(). % single-letter variable name, upper-case
 -type value() :: integer(). % | string() ?
@@ -180,21 +181,34 @@ finalize(Parsed) ->
         false ->
             Parsed1 = ensure_flatlist(Parsed),
             case get_param_max(Parsed1) of
-                0 -> fun(SVs) -> eval_parsed({},SVs,Parsed1) end;
-                1 -> fun(A,SVs) -> eval_parsed({A},SVs,Parsed1) end;
-                2 -> fun(A,B,SVs) -> eval_parsed({A,B},SVs,Parsed1) end;
-                3 -> fun(A,B,C,SVs) -> eval_parsed({A,B,C},SVs,Parsed1) end;
-                4 -> fun(A,B,C,D,SVs) -> eval_parsed({A,B,C,D},SVs,Parsed1) end;
-                5 -> fun(A,B,C,D,E,SVs) ->
-                             eval_parsed({A,B,C,D,E},SVs,Parsed1) end;
-                6 -> fun(A,B,C,D,E,F,SVs) ->
-                             eval_parsed({A,B,C,D,E,F},SVs,Parsed1) end;
-                7 -> fun(A,B,C,D,E,F,G,SVs) ->
-                             eval_parsed({A,B,C,D,E,F,G},SVs,Parsed1) end;
-                8 -> fun(A,B,C,D,E,F,G,H,SVs) ->
-                             eval_parsed({A,B,C,D,E,F,G,H},SVs,Parsed1) end;
-                9 -> fun(A,B,C,D,E,F,G,H,I,SVs) ->
-                             eval_parsed({A,B,C,D,E,F,G,H,I},SVs,Parsed1) end
+                0 -> fun(EvalOpts) ->
+                             eval_parsed({}, Parsed1, EvalOpts)
+                     end;
+                1 -> fun(A, EvalOpts) ->
+                             eval_parsed({A}, Parsed1, EvalOpts) end;
+                2 -> fun(A,B,EvalOpts) ->
+                             eval_parsed({A, B}, Parsed1, EvalOpts) end;
+                3 -> fun(A,B,C,EvalOpts) ->
+                             eval_parsed({A, B, C}, Parsed1, EvalOpts) end;
+                4 -> fun(A,B,C,D,EvalOpts) ->
+                             eval_parsed({A, B, C, D}, Parsed1, EvalOpts) end;
+                5 -> fun(A,B,C,D,E,EvalOpts) ->
+                             eval_parsed({A, B, C, D, E}, Parsed1, EvalOpts)
+                     end;
+                6 -> fun(A, B, C, D, E, F, EvalOpts) ->
+                             eval_parsed({A, B, C, D, E, F},
+                                         Parsed1, EvalOpts) end;
+                7 -> fun(A, B, C, D, E, F, G, EvalOpts) ->
+                             eval_parsed({A, B, C, D, E, F, G},
+                                         Parsed1, EvalOpts) end;
+                8 -> fun(A, B, C, D, E, F, G, H, EvalOpts) ->
+                             eval_parsed({A, B, C, D, E, F, G, H},
+                                         Parsed1, EvalOpts)
+                     end;
+                9 -> fun(A, B, C, D, E, F, G, H, I, EvalOpts) ->
+                             eval_parsed({A, B, C, D, E, F, G, H, I},
+                                         Parsed1, EvalOpts)
+                     end
             end
     end.
 
@@ -215,11 +229,11 @@ get_pnums([_ | R]) ->
 get_pnums([]) ->
     [].
 
-eval_parsed(Params0, StaticVars, Parsed) ->
+eval_parsed(Params0, Parsed, EvalOpts) ->
     State0 = #{stack => [],
                params => maps:from_list(enumerate(tuple_to_list(Params0))),
                dyn_vars => #{},
-               static_vars => StaticVars,
+               static_vars => maps:get(static_vars, EvalOpts, #{}),
                incr_done => false,
                %% The result:
                acc => []},
