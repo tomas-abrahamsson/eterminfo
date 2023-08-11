@@ -117,7 +117,8 @@ skip_whitespace_or_till_eoln(S)          -> {ok, after_whitespace, S}.
 
 read_until_comma(S) -> read_until_comma(S, _Acc="").
 
-read_until_comma("\\"++[C|T], Acc) -> read_until_comma(T, [C|[$\\|Acc]]);
+read_until_comma("^\\"++T, Acc)    -> read_until_comma(T, [$\\, $^ | Acc]);
+read_until_comma("\\"++[C|T], Acc) -> read_until_comma(T, [C, $\\ | Acc]);
 read_until_comma(","++Rest, Acc)   -> {ok, flatten(reverse(Acc)), Rest};
 read_until_comma([eof], _Acc)      -> eof_seen;
 read_until_comma([C | Rest], Acc)  -> read_until_comma(Rest, [C | Acc]);

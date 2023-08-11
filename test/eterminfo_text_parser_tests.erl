@@ -54,31 +54,38 @@ backslash_escape_test() ->
     %% as a null character on most terminals, providing CS7 is  specified.
     %% See stty(1)." -- the terminfo(5) man page.
     #{nul := [128]} = parse_simple("nul=\\0"), % \200 = 128
+    #{nul := [128]} = parse_simple("nul=\\000"), % \200 = 128
+    #{nul := [128]} = parse_simple("nul=\\200"), % \200 = 128
     ok.
 
 control_char_test() ->
     %% The special case ^? is interpreted as DEL (127)
     #{del := [127]} = parse_simple("del=^?"),
-    %% In all other cases, the character  value  is AND'd  with 0x1f,
-    %% mapping to ASCII control codes in the range 0 through 31.
-    %% #{ctrlchar := [128]}   = parse_simple("ctrlchar=^@"), % FIXME
+    %% "In all other cases, the character  value  is AND'd  with 0x1f,
+    %% mapping to ASCII control codes in the range 0 through 31."
+    %% ... but ^@ turns info \200 = 128 just like \0 and \000
+    #{ctrlchar := [128]}   = parse_simple("ctrlchar=^@"),
     #{ctrlchar := [1]}     = parse_simple("ctrlchar=^A"),
+    #{ctrlchar := [1]}     = parse_simple("ctrlchar=^a"),
     #{ctrlchar := [7]}     = parse_simple("ctrlchar=^G"),
+    #{ctrlchar := [7]}     = parse_simple("ctrlchar=^g"), % lower case = upper
     #{ctrlchar := [26]}    = parse_simple("ctrlchar=^Z"),
+    #{ctrlchar := [26]}    = parse_simple("ctrlchar=^z"),
     #{ctrlchar := [27]}    = parse_simple("ctrlchar=^["),
-    %%#{ctrlchar := [28]}  = parse_simple("ctrlchar=^\\"), % FIXME
+    #{ctrlchar := [28]}    = parse_simple("ctrlchar=^\\"),
     #{ctrlchar := [29]}    = parse_simple("ctrlchar=^]"),
     #{ctrlchar := [30]}    = parse_simple("ctrlchar=^^"),
     #{ctrlchar := [31]}    = parse_simple("ctrlchar=^_"),
-    %%#{ctrlchar := [128]}  = parse_simple("ctrlchar=^`"), % FIXME
-    #{ctrlchar := [1]}      = parse_simple("ctrlchar=^a"),
-    %% #{ctrlchar := [27]}     = parse_simple("ctrlchar=^{"), % FIXME
-    %% #{ctrlchar := [30]}     = parse_simple("ctrlchar=^~"), % FIXME
+    #{ctrlchar := [128]}   = parse_simple("ctrlchar=^`"),
+    #{ctrlchar := [27]}    = parse_simple("ctrlchar=^{"),
+    #{ctrlchar := [28]}    = parse_simple("ctrlchar=^|"),
+    #{ctrlchar := [29]}    = parse_simple("ctrlchar=^}"),
+    #{ctrlchar := [30]}    = parse_simple("ctrlchar=^~"),
     ok.
 
 octal_test() ->
     #{oct := [128]}   = parse_simple("oct=\\0"),
-    %% #{oct := [128]}   = parse_simple("oct=\\000"), % FIXME
+    #{oct := [128]}   = parse_simple("oct=\\000"),
     #{oct := [128]}   = parse_simple("oct=\\200"),
     #{oct := [7]}     = parse_simple("oct=\\007"),
     #{oct := [255]}   = parse_simple("oct=\\377"),

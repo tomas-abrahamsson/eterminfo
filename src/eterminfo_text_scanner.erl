@@ -35,7 +35,7 @@ string(Str) ->
 
 s("\\E" ++ Rest)   -> "\e" ++ s(Rest);
 s("\\e" ++ Rest)   -> "\e" ++ s(Rest);
-s([$^, C |  Rest]) -> [extr_ctrlchar([C]) | s(Rest)];
+s([$^, C |  Rest]) -> [extr_ctrlchar(C) | s(Rest)];
 s("\\," ++ Rest)   -> "," ++ s(Rest);
 s("\\:" ++ Rest)   -> ":" ++ s(Rest);
 s("\\^" ++ Rest)   -> "^" ++ s(Rest);
@@ -54,15 +54,23 @@ s("%" ++ [C | Rest]) -> "%" ++ [C] ++ s(Rest); % eat ^ in %^
 s([C | Rest])    -> [C | s(Rest)];
 s("")            -> "".
 
-extr_ctrlchar([$@])  -> 0;
-extr_ctrlchar([C]) when C >= $A, C =< $Z -> C - $A + 1;
-extr_ctrlchar([C]) when C >= $a, C =< $z -> C - $a + 1;
-extr_ctrlchar([$\[]) -> 27;
-extr_ctrlchar([$\\]) -> 28;
-extr_ctrlchar([$\]]) -> 29;
-extr_ctrlchar([$^])  -> 30;
-extr_ctrlchar([$_])  -> 31;
-extr_ctrlchar([$?])  -> 127.
+extr_ctrlchar($@)   -> 8#200; %% 0 be 128
+extr_ctrlchar(C) when $A =< C, C =< $Z -> C - $A + 1;
+extr_ctrlchar(C) when $a =< C, C =< $z -> C - $a + 1;
+extr_ctrlchar($[)  -> 27;
+extr_ctrlchar($\\) -> 28;
+extr_ctrlchar($])  -> 29;
+extr_ctrlchar($^)  -> 30;
+extr_ctrlchar($_)  -> 31;
+extr_ctrlchar(${)  -> 27;
+extr_ctrlchar($|)  -> 28;
+extr_ctrlchar($})  -> 29;
+extr_ctrlchar($~)  -> 30;
+extr_ctrlchar($?)  -> 127;
+extr_ctrlchar($`)  -> 128.
 
 extr_oct([O1, O2, O3]) ->
-    ((O1 - $0) bsl (3+3)) + ((O2 - $0) bsl 3) + (O3 - $0).
+    Oct = ((O1 - $0) bsl (3+3)) + ((O2 - $0) bsl 3) + (O3 - $0),
+    if Oct == 0 -> 8#200; %% 0 is to be 128
+       true -> Oct
+    end.
