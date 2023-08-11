@@ -24,8 +24,6 @@
 
 -module(eterminfo_strcap_parser).
 
--import(lists, [foldl/3]).
-
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -217,109 +215,120 @@ get_pnums([_ | R]) ->
 get_pnums([]) ->
     [].
 
-eval_parsed(Params0, StatVars, Parsed) ->
-    {_, Params} = foldl(fun(V, {K, Ps}) -> {K+1, Ps#{K => V}} end,
-                        {1, #{}},
-                        tuple_to_list(Params0)),
-    DynVars = #{},
-    {_St, _Ps, _DVs, _SVs, Acc} =
-        ep(Parsed, _Stack = [], Params, DynVars, StatVars, _Acc = []),
-    _Result = lists:flatten(lists:reverse(Acc)).
+eval_parsed(Params0, StaticVars, Parsed) ->
+    State0 = #{stack => [],
+               params => maps:from_list(enumerate(tuple_to_list(Params0))),
+               dyn_vars => #{},
+               static_vars => StaticVars,
+               %% The result:
+               acc => []},
+    #{acc := Acc} = ep(Parsed, State0),
+    lists:flatten(lists:reverse(Acc)).
 
-ep([{push, {param, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case Ps of
-        #{N := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
+ep([Elem | Rest], #{stack := Stack, params := Ps,
+                    dyn_vars := DVs, static_vars := SVs,
+                    acc := Acc}=State) ->
+    case Elem of
+        {push, {param, N}} ->
+            case Ps of
+                #{N := V} -> ep(Rest, State#{stack := [V | Stack]});
+                #{}       -> ep(Rest, State)
+            end;
+        {push, {dyn_var, K}} ->
+            case DVs of
+                #{K := V} -> ep(Rest, State#{stack := [V | Stack]});
+                #{}       -> ep(Rest, State)
+            end;
+        {push, {static_var, K}} ->
+            case SVs of
+                #{K := V} -> ep(Rest, State#{stack := [V | Stack]});
+                #{}       -> ep(Rest, State)
+            end;
+        {push, {int, N}} ->
+            ep(Rest, State#{stack := [N | Stack]});
+        {pop, as_char} ->
+            {V, Stack1} = pop_number(Stack),
+            ep(Rest, State#{stack := Stack1, acc := [V | Acc]});
+        {pop, as_string} ->
+            {V, Stack1} = pop_string(Stack),
+            ep(Rest, State#{stack := Stack1, acc := [V | Acc]});
+        {pop, {printf, FmtInfo}} ->
+            {V, Stack1} = pop_elem(Stack),
+            Acc1 = [printf_format(FmtInfo,V) | Acc],
+            ep(Rest, State#{stack := Stack1, acc := Acc1});
+        {pop, {dyn_var, K}} ->
+            {V, Stack1} = pop_elem(Stack),
+            ep(Rest, State#{stack := Stack1, dyn_vars := DVs#{K => V}});
+        {pop, {static_var, K}} ->
+            {V, Stack1} = pop_elem(Stack),
+            ep(Rest, State#{stack := Stack1, static_vars := SVs#{K => V}});
+        strlen ->
+            {V, Stack1} = pop_string(Stack),
+            ep(Rest, State#{stack := [length(V) | Stack1]});
+        add ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [V1 + V2 | Stack1]});
+        sub ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [V1 - V2 | Stack1]});
+        mul ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [V1 * V2 | Stack1]});
+        'div' ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            if V2 /= 0 -> ep(Rest, State#{stack := [(V1 div V2) | Stack1]});
+               V2 == 0 -> ep(Rest, State#{stack := [0 | Stack1]})
+            end;
+        mod ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            if V2 /= 0 -> ep(Rest, State#{stack := [(V1 rem V2) | Stack1]});
+               V2 == 0 -> ep(Rest, State#{stack := [0 | Stack1]})
+            end;
+        bitand ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [(V1 band V2) | Stack1]});
+        bitor ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [(V1 bor V2) | Stack1]});
+        bitxor ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [(V1 bxor V2) | Stack1]});
+        eq ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [logeq(V1, V2) | Stack1]});
+        lt -> % less than
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [loglt(V1, V2) | Stack1]});
+        gt -> % greater than
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [loggt(V1, V2) | Stack1]});
+        logand ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [logand(V1, V2) | Stack1]});
+        logor ->
+            {V1, V2, Stack1} = pop2_numbers(Stack),
+            ep(Rest, State#{stack := [logor(V1, V2) | Stack1]});
+        lognot ->
+            {V1, Stack1} = pop_number(Stack),
+            ep(Rest, State#{stack := [lognot(V1) | Stack1]});
+        bitnot ->
+            {V1, Stack1} = pop_number(Stack),
+            ep(Rest, State#{stack := [(bnot V1) | Stack1]});
+        incr ->
+            ep(Rest, State#{params := incr_first_two_params_if_ints(Ps)});
+        {'if', Cond, {then, Then}, {else, Else}} ->
+            #{stack := Stack1}=State1 = ep(Cond, State),
+            {H, Stack2} = pop_number(Stack1),
+            State2 = State1#{stack := Stack2},
+            State3 = if H /= 0 -> ep(ensure_flatlist(Then), State2);
+                        H == 0 -> ep(ensure_flatlist(Else), State2)
+                     end,
+            ep(Rest, State3);
+        _ ->
+            ep(Rest, State#{acc := [Elem | Acc]})
     end;
-ep([{push, {dyn_var, K}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case DVs of
-        #{K := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
-    end;
-ep([{push, {stat_var, K}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    case SVs of
-        #{K := V} -> ep(Rest, [V | St], Ps, DVs, SVs, Acc);
-        #{}       -> ep(Rest, St,       Ps, DVs, SVs, Acc)
-    end;
-ep([{push, {int, N}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    ep(Rest, [N | St], Ps, DVs, SVs, Acc);
-ep([{pop, as_char} | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_number(Stack),
-    ep(Rest, Stack1, Ps, DVs, SVs, [V | Acc]);
-ep([{pop, as_string} | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_string(Stack),
-    ep(Rest, Stack1, Ps, DVs, SVs, [V | Acc]);
-ep([{pop, {printf, FmtInfo}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_elem(Stack),
-    ep(Rest, Stack1, Ps, DVs, SVs, [printf_format(FmtInfo,V) | Acc]);
-ep([{pop, {dyn_var, K}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_elem(Stack),
-    ep(Rest, Stack1, Ps, DVs#{K => V}, SVs, Acc);
-ep([{pop, {stat_var, K}} | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_elem(Stack),
-    ep(Rest, Stack1, Ps, DVs, SVs#{K => V}, Acc);
-ep([strlen | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V, Stack1} = pop_string(Stack),
-    ep(Rest, [length(V) | Stack1], Ps, DVs, SVs, Acc);
-ep([add | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [V1 + V2 | Stack1], Ps, DVs, SVs, Acc);
-ep([sub | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [V1 - V2 | Stack1], Ps, DVs, SVs, Acc);
-ep([mul | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [V1 * V2 | Stack1], Ps, DVs, SVs, Acc);
-ep(['div' | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    if V2 /= 0 -> ep(Rest, [(V1 div V2) | Stack1], Ps, DVs, SVs, Acc);
-       V2 == 0 -> ep(Rest, [0 | Stack1], Ps, DVs, SVs, Acc)
-    end;
-ep([mod | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    if V2 /= 0 -> ep(Rest, [(V1 rem V2) | Stack1], Ps, DVs, SVs, Acc);
-       V2 == 0 ->  ep(Rest, [0 | Stack1], Ps, DVs, SVs, Acc)
-    end;
-ep([bitand | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [(V1 band V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([bitor | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [(V1 bor V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([bitxor | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [(V1 bxor V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([eq | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [logeq(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([lt | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [loglt(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([gt | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [loggt(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([logand | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [logand(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([logor | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, V2, Stack1} = pop2_numbers(Stack),
-    ep(Rest, [logor(V1, V2) | Stack1], Ps, DVs, SVs, Acc);
-ep([lognot | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, Stack1} = pop_number(Stack),
-    ep(Rest, [lognot(V1) | Stack1], Ps, DVs, SVs, Acc);
-ep([bitnot | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    {V1, Stack1} = pop_number(Stack),
-    ep(Rest, [(bnot V1) | Stack1], Ps, DVs, SVs, Acc);
-ep([incr | Rest], Stack, Ps, DVs, SVs, Acc) ->
-    ep(Rest, Stack, incr_first_two_params_if_ints(Ps), DVs, SVs, Acc);
-ep([{'if', Cond, {then, Then}, {else, Else}} | Rest], St, Ps, DVs, SVs, Acc) ->
-    {St1, Ps1, DVs1, SVs1, Acc1} =
-        eval_if_then_else(Cond, Then, Else, St, Ps, DVs, SVs, Acc),
-    ep(Rest, St1, Ps1, DVs1, SVs1, Acc1);
-ep([S | Rest], St, Ps, DVs, SVs, Acc) ->
-    ep(Rest, St, Ps, DVs, SVs, [S | Acc]);
-ep([], St, Ps, DVs, SVs, Acc) ->
-    {St, Ps, DVs, SVs, Acc}.
+ep([], State) ->
+    State.
 
 incr_first_two_params_if_ints(Ps0) ->
     Ps1 = case Ps0 of
@@ -354,17 +363,6 @@ coerce_string(_)                 -> "".
 
 pop_elem([Elem | RestStack]) -> {Elem, RestStack};
 pop_elem([])                 -> {0, []}.
-
-eval_if_then_else(Cond, Then, Else, St0, Ps0, DVs0, SVs0, Acc0) ->
-    {Stack1, Ps1, DVs1, SVs1, Acc1} = ep(Cond, St0, Ps0, DVs0, SVs0, Acc0),
-    {H, Stack2} = pop_number(Stack1),
-    if H /= 0 ->
-            Then1 = ensure_flatlist(Then),
-            ep(Then1, Stack2, Ps1, DVs1, SVs1,Acc1);
-       H == 0 ->
-            Else1 = ensure_flatlist(Else),
-            ep(Else1, Stack2, Ps1, DVs1, SVs1,Acc1)
-    end.
 
 logeq(V2,   V1) when V2 == V1 -> 1;
 logeq(_V2, _V1)               -> 0.
@@ -472,5 +470,8 @@ convert_value3(oct, V) when is_integer(V)    -> f("~.8b", [V]);
 convert_value3(hex_lc, V) when is_integer(V) -> f("~.16b", [V]);
 convert_value3(hex_uc, V) when is_integer(V) -> f("~.16B", [V]);
 convert_value3(str, V) when is_list(V)       -> f("~s", [V]).
+
+enumerate(List) ->
+    lists:zip(lists:seq(1, length(List)), List).
 
 f(F, A) -> lists:flatten(io_lib:format(F, A)).

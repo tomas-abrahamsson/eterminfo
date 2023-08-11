@@ -31,8 +31,8 @@ Rules.
 \%p[1-9] :     {token, {push, TokenLine, {param,extr_paramnum(TokenChars)}}}.
 \%P[a-z] :     {token, {pop,  TokenLine, {dyn_var,extr_var(TokenChars)}}}.
 \%g[a-z] :     {token, {push, TokenLine, {dyn_var,extr_var(TokenChars)}}}.
-\%P[A-Z] :     {token, {pop,  TokenLine, {stat_var,extr_var(TokenChars)}}}.
-\%g[A-Z] :     {token, {push, TokenLine, {stat_var,extr_var(TokenChars)}}}.
+\%P[A-Z] :     {token, {pop,  TokenLine, {static_var,extr_var(TokenChars)}}}.
+\%g[A-Z] :     {token, {push, TokenLine, {static_var,extr_var(TokenChars)}}}.
 \%'.'    :     {token, {push, TokenLine, {int,extr_cconst(TokenChars)}}}.
 \%\{[0-9]+\} : {token, {push, TokenLine, {int,extr_iconst(TokenChars)}}}.
 \%l  :         {token, {op1,  TokenLine, strlen}}.
@@ -102,13 +102,13 @@ Erlang code.
                       mandatory := boolean()}.
 -type push() :: {param, 1..9}
               | {dyn_var, var()}
-              | {stat_var, var()}
+              | {static_var, var()}
               | {int, integer()}.
 -type pop() :: {printf, fmt()}
              | as_char
              | as_string
              | {dyn_var, var()}
-             | {stat_var, var()}.
+             | {static_var, var()}.
 -type var() :: string(). % one-letter strings, case matters
 -type fmt() :: {colon(), flags(), width(), precision(), convtype()}.
 -type colon() :: boolean().
