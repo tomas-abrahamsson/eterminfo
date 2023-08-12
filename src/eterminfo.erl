@@ -593,8 +593,8 @@ tputs_m(Str, N) ->
                           %% Should maybe output as many NULs instead as
                           %% needed to produce the delay given the baud rate?
                           %% I think this is what ncurses does.
-                          if IsMand, IsProp -> timer:sleep(Delay * N);
-                             IsMand         -> timer:sleep(Delay);
+                          if IsMand, IsProp -> timer:sleep(ceil(Delay * N));
+                             IsMand         -> timer:sleep(ceil(Delay));
                              true           -> ok
                           end
                   end,

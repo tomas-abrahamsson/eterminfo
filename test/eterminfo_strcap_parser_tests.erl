@@ -24,9 +24,34 @@
 %% modules
 
 delay_capability_test() ->
+    %% Delay is in milliseconds, but may be specified with decimals
+    %% or with only decimals
     [27,75,{pad,#{delay        := 5,
                   proportional := false,
-                  mandatory    := false}}] = parse_str("\eK$<5>").
+                  mandatory    := false}}] = parse_str("\eK$<5>"),
+    %% Chose values exactly representable as floats
+    %% to avoid rounding issues
+    [27,75,{pad,#{delay        := 12.5,
+                  proportional := false,
+                  mandatory    := false}}] = parse_str("\eK$<12.5>"),
+    [27,75,{pad,#{delay        := 0.5,
+                  proportional := false,
+                  mandatory    := false}}] = parse_str("\eK$<.5>"),
+    %% Mandatory:
+    [27,75,{pad,#{delay        := 5,
+                  proportional := false,
+                  mandatory    := true}}] = parse_str("\eK$<5/>"),
+    %% Proportional:
+    [27,75,{pad,#{delay        := 5,
+                  proportional := true,
+                  mandatory    := false}}] = parse_str("\eK$<5*>"),
+    %% Proportional and mandatory:
+    [27,75,{pad,#{delay        := 5,
+                  proportional := true,
+                  mandatory    := true}}] = parse_str("\eK$<5*/>"),
+    %% a something not a delay, although the beginning of it looks like one
+    "\e$<abc" = parse_str("\e$<abc"),
+    ok.
 
 %% Various parameterized string tests
 %%

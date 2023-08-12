@@ -57,7 +57,8 @@ Rules.
 \%e  :         {token, {'else', TokenLine}}.
 \%;  :         {token, {endif,TokenLine}}.
 
-\$<[0-9]+[*/]?[*/]?> :
+%% $<2.5> $<.5> $<2> are all valid delay values
+\$<([0-9]+|[0-9]+\.[0-9]|\.[0-9]+)[*/]?[*/]?> :
                {token, {pad,  TokenLine, extr_padding(TokenChars)}}.
 
 .    :         {token, {char, TokenLine, hd(TokenChars)}}.
@@ -97,7 +98,7 @@ Erlang code.
                | {'else', pos()}
                | {endif, pos()}.
 -type pos() :: non_neg_integer(). % line number
--type pad_info() :: #{delay := non_neg_integer(),
+-type pad_info() :: #{delay := non_neg_integer() | float(),
                       proportional := boolean(),
                       mandatory := boolean()}.
 -type push() :: {param, 1..9}
@@ -122,6 +123,8 @@ Erlang code.
                    | logand | logor
                    | eq | lt | gt.
 
+-define(is_digit(C), $0 =< C, C =< $9).
+
 %%--------------------------------------------------------------------
 %% Records
 %%--------------------------------------------------------------------
@@ -140,18 +143,23 @@ extrint([N | Rest], Acc) -> extrint(Rest, Acc*10 + (N - $0)).
 
 extr_padding("$<"++Rest) ->
     {NStr, Rest2} = extr_padding_n(Rest),
-    N = list_to_integer(NStr),
+    N = case {lists:member($., NStr), lists:prefix(".", NStr)} of
+            {false, _}    -> list_to_integer(NStr);
+            {true, false} -> list_to_float(NStr);
+            {true, true}  -> list_to_float("0" ++ NStr)
+        end,
     Proportional = lists:member($*, Rest2),
     Mandatory = lists:member($/, Rest2),
     #{delay        => N,
       proportional => Proportional,
       mandatory    => Mandatory}.
 
-extr_padding_n(Str) -> extr_p_n(Str, _Acc = "").
-extr_p_n([C | Rest], Acc) when C >= $0, C =< $9 -> extr_p_n(Rest, [C | Acc]);
-extr_p_n("*"++Rest, Acc)                        -> {reverse(Acc), "*"++Rest};
-extr_p_n("/"++Rest, Acc)                        -> {reverse(Acc), "/"++Rest};
-extr_p_n(">"++Rest, Acc)                        -> {reverse(Acc), Rest}.
+extr_padding_n(Str) -> extr_p_n(Str, _Acc1 = "").
+extr_p_n([C | Rest], Acc) when ?is_digit(C) -> extr_p_n(Rest, [C | Acc]);
+extr_p_n("."++Rest, Acc)                    -> extr_p_n(Rest, "."++Acc);
+extr_p_n("*"++Rest, Acc)                    -> {reverse(Acc), "*"++Rest};
+extr_p_n("/"++Rest, Acc)                    -> {reverse(Acc), "/"++Rest};
+extr_p_n(">"++Rest, Acc)                    -> {reverse(Acc), Rest}.
 
 
 split_fmt_str("%"++Rest) -> split_fmt_str1(Rest).
