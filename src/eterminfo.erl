@@ -65,6 +65,7 @@
 -export([tigetflag/1, tigetflag/2]).
 -export([tigetnum/1, tigetnum/2]).
 -export([tigetstr/1, tigetstr/2]).
+-export([tputs/1, tputs/2]).
 
 %% Lower-level contituents api:
 
@@ -79,6 +80,7 @@
 -export([tigetflag_m/2]).
 -export([tigetnum_m/2]).
 -export([tigetstr_m/2]).
+-export([tputs_m/2]).
 
 -export_type([term_name/0, terminfo/0]).
 -export_type([infocmp_opts/0]).
@@ -126,6 +128,8 @@
 
 -type install_key() :: #{term := term_name(),
                          cap_names := cap_name_format()}.
+
+-define(is_char(C), is_integer(C)).
 
 %% @equiv install_by_infocmp(#{})
 install_by_infocmp() ->
@@ -394,6 +398,13 @@ tigetstr(CapName) ->
 tigetstr(CapName, Spec) ->
     tigetstr_m(get_installed_terminfo(Spec), CapName).
 
+tputs(Str) ->
+    tputs_m(Str, 1).
+
+tputs(Str, N) when is_integer(N) ->
+    tputs_m(Str, N).
+
+
 -spec tparm_m(terminfo(), cap_name(), [term()]) -> out_seq().
 tparm_m(TermInfo, CapName, Args) ->
     case TermInfo of
@@ -433,3 +444,35 @@ tigetstr_m(M, CapName) ->
         #{CapName := X} -> {error,{not_a_string_capability,CapName,X}};
         _               -> {error,{string_capability_not_found,CapName}}
     end.
+
+tputs_m(Str, N) ->
+    Elems = split_at_delays(Str, none, []),
+    lists:foreach(fun(S) when is_list(S) ->
+                          io:put_chars(S);
+                     ({pad, #{delay := Delay,
+                              proportional := IsProp,
+                              mandatory := IsMand}}) ->
+                          %% Should maybe output as many NULs instead as
+                          %% needed to produce the delay given the baud rate?
+                          %% I think this is what ncurses does.
+                          if IsMand, IsProp -> timer:sleep(Delay * N);
+                             IsMand         -> timer:sleep(Delay);
+                             true           -> ok
+                          end
+                  end,
+                  Elems).
+
+split_at_delays([C | Rest], CurrS, Acc) when ?is_char(C) ->
+    CurrS1 = acc_char(C, CurrS),
+    split_at_delays(Rest, CurrS1, Acc);
+split_at_delays([{pad, _}=Pad | Rest], CurrS, Acc) ->
+    Acc1 = acc_str(CurrS, Acc),
+    split_at_delays(Rest, none, [Pad | Acc1]);
+split_at_delays([], CurrS, Acc) ->
+    lists:reverse(acc_str(CurrS, Acc)).
+
+acc_char(C, none) -> [C];
+acc_char(C, CurrS) -> [C | CurrS].
+
+acc_str(none, Acc) -> Acc;
+acc_str(CurrS, Acc) -> [lists:reverse(CurrS) | Acc].
