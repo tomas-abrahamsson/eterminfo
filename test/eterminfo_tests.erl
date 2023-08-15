@@ -55,31 +55,7 @@ vt100_short_test() ->
     ok.
 
 file_non_extended_test() ->
-    %% From the example in the term(5) man page
-    {ok, M} = parse_terminfo_file_from_hexdump(
-                "adm3a",
-                <<"1a 01 10 00 02 00 03 00  82 00 31 00 61 64 6d 33
-                   61 7c 6c 73 69 20 61 64  6d 33 61 00 00 01 50 00
-                   ff ff 18 00 ff ff 00 00  02 00 ff ff ff ff 04 00
-                   ff ff ff ff ff ff ff ff  0a 00 25 00 27 00 ff ff
-                   29 00 ff ff ff ff 2b 00  ff ff 2d 00 ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
-                   ff ff ff ff ff ff 2f 00  07 00 0d 00 1a 24 3c 31
-                   3e 00 1b 3d 25 70 31 25  7b 33 32 7d 25 2b 25 63
-                   25 70 32 25 7b 33 32 7d  25 2b 25 63 00 0a 00 1e
-                   00 08 00 0c 00 0b 00 0a  00">>),
+    {ok, M} = parse_terminfo_file_from_hexdump("adm3a", adm3a_hexdump()),
     #{am := true,
       cols := 80, lines := 24,
       bel := [7], clear := [8#32, {pad, #{delay := 1,
@@ -89,6 +65,49 @@ file_non_extended_test() ->
       cup := CupF, cuu1 := [11], home := [30], ind := [10]} = M,
     "\e" ++ _ = CupF(1, 1, #{}),
     ok.
+
+
+tigetstr_test() ->
+    with(terminfo_installed_from_file_hexdump(adm3a_hexdump()),
+         fun(Spec) ->
+                 [7] = eterminfo:tigetstr(bel, Spec)
+         end).
+
+tigetnum_test() ->
+    with(terminfo_installed_from_file_hexdump(adm3a_hexdump()),
+         fun(Spec) ->
+                 80 = eterminfo:tigetnum(cols, Spec),
+                 24 = eterminfo:tigetnum(lines, Spec)
+         end).
+
+tparm_test() ->
+    with(terminfo_installed_from_file_hexdump(adm3a_hexdump()),
+         fun(Spec) ->
+                 "\e=!!" = eterminfo:tparm(cup, 1, 1, Spec)
+         end).
+
+tputs_test() ->
+    with(terminfo_installed_from_file_hexdump(adm3a_hexdump()),
+         fun(Spec) ->
+                 eterminfo:tputs(eterminfo:tparm(cup, 1, 1, Spec)),
+                 "\e=!!" = unicode:characters_to_list(?capturedOutput)
+         end).
+
+tputs_with_delay_test() ->
+    with(terminfo_installed_from_infocmp_str(["dummy,", "\tclear=x$<50/>y,"]),
+         fun(Spec) ->
+                 [$x, {pad, #{delay := Delay, mandatory := true}}, $y] =
+                     Clear =
+                     eterminfo:tigetstr(clear, Spec),
+                 T0 = erlang:monotonic_time(millisecond),
+                 eterminfo:tputs(Clear),
+                 T1 = erlang:monotonic_time(millisecond),
+                 "xy" = unicode:characters_to_list(?capturedOutput),
+                 Margin = Delay * 0.1,
+                 ?assert((T1 - T0) >= floor(Delay - Margin),
+                         #{actual_delay => T1 - T0,
+                           expect_delay => Delay})
+         end).
 
 parse_terminfo_str(TermName, Lines) ->
     S = ensure_ends_with_newline(string:join(Lines, "\n")),
@@ -102,15 +121,39 @@ ensure_ends_with_newline(S) ->
     end.
 
 parse_terminfo_file_from_hexdump(TermName, HexDump) ->
-    Bin = <<<<(list_to_integer([C], 16)):4>>
-            || <<C>> <= iolist_to_binary(HexDump),
-               is_hex_digit(C)>>,
+    Bin = bin_from_hexdump(HexDump),
     eterminfo:read_by_file(TermName, #{terminfo_bin => Bin}).
+
+bin_from_hexdump(HexDump) ->
+    <<<<(list_to_integer([C], 16)):4>>
+      || <<C>> <= iolist_to_binary(HexDump),
+         is_hex_digit(C)>>.
 
 is_hex_digit(D) when $0 =< D, D =< $9 -> true;
 is_hex_digit(D) when $A =< D, D =< $F -> true;
 is_hex_digit(D) when $a =< D, D =< $f -> true;
 is_hex_digit(_) -> false.
+
+with(ReadF, TestF) ->
+    TermName = "test-dummy",
+    Spec = #{term => TermName},
+    {ok, TermInfo} = ReadF(Spec),
+    ok = eterminfo:install_terminfo(Spec, TermInfo),
+    try
+        TestF(Spec)
+    after
+        ok = eterminfo:uninstall(Spec)
+    end.
+
+terminfo_installed_from_infocmp_str(Lines) ->
+    fun(#{term := TermName}) ->
+            parse_terminfo_str(TermName, Lines)
+    end.
+
+terminfo_installed_from_file_hexdump(HexDump) ->
+    fun(#{term := TermName}) ->
+            parse_terminfo_file_from_hexdump(TermName, HexDump)
+    end.
 
 vt100_long_lines() ->
     ["#\tReconstructed via infocmp from file: /lib/terminfo/v/vt100",
@@ -179,3 +222,28 @@ vt100_short_lines() ->
      "\tsgr=\\E[0%?%p1%p6%|%t;1%;%?%p2%t;4%;%?%p1%p3%|%t;7%;%?%p4%t;5%;m%?%p9%t\\016%e\\017%;$<2>,",
      "\tsgr0=\\E[m\\017$<2>, smacs=^N, smam=\\E[?7h, smkx=\\E[?1h\\E=,",
      "\tsmso=\\E[7m$<2>, smul=\\E[4m$<2>, tbc=\\E[3g,"].
+
+adm3a_hexdump() ->
+    %% From the example in the term(5) man page
+    <<"1a 01 10 00 02 00 03 00  82 00 31 00 61 64 6d 33
+       61 7c 6c 73 69 20 61 64  6d 33 61 00 00 01 50 00
+       ff ff 18 00 ff ff 00 00  02 00 ff ff ff ff 04 00
+       ff ff ff ff ff ff ff ff  0a 00 25 00 27 00 ff ff
+       29 00 ff ff ff ff 2b 00  ff ff 2d 00 ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff
+       ff ff ff ff ff ff 2f 00  07 00 0d 00 1a 24 3c 31
+       3e 00 1b 3d 25 70 31 25  7b 33 32 7d 25 2b 25 63
+       25 70 32 25 7b 33 32 7d  25 2b 25 63 00 0a 00 1e
+       00 08 00 0c 00 0b 00 0a  00">>.
