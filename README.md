@@ -3,17 +3,18 @@ The eterminfo is a terminfo handler for Erlang.
 Features of eterminfo
 ---------------------
 
-* Reads terminfo descriptions using the infocmp program,
-  with an option to read long names
+* Reads terminfo descriptions, either using the infocmp program,
+  or from compiled terminfo files. There is an an option to use
+  long names.
 
-* Produces a dict, that holds the parsed terminfo capabilities.
+* Produces a map, that holds the parsed terminfo capabilities.
 
 Example usage
 -------------
 ```
   > ok = eterminfo:get_term_type().
   "vt100"
-  > eterminfo:install_by_infocmp().
+  > eterminfo:install_by_file().
   ok
 
   %% Reading a string capability: what string to send to produce a beep
@@ -37,15 +38,16 @@ Example usage
   > eterminfo:tigetstr('$terminfo_names').
   ["vt100","vt100-am","DEC VT100 (w/advanced video)"]
 
-  %% Capability string can have padding---delays in milliseconds---at some places.
-  %% If the padding may be proportional to the number of lines.
+  %% Capability string can have padding---ie delays (in milliseconds)---at some places.
+  %% The padding may also be proportional to the number of lines.
   %% See terminfo(5) for more info.
+  %% See eterminof:tputs/1,2 for outputting a string with paddings.
   > eterminfo:tparm(cursor_address, 10, 10).
   [27,91,49,49,59,49,49,72,
    {pad,#{delay => 5,mandatory => false,proportional => false}}]
 
   %% Reading all installed capabilities as a map.
-  %% For each parametersized capability, the string representatino is also
+  %% For each parametersized capability, the string representation is also
   %% present in the '$str_literals' map
   > eterminfo:get_installed_terminfo().
   #{key_right => "\eOC",
@@ -59,6 +61,18 @@ Example usage
     '$str_literals' => #{..., parm_left_cursor => "\\E[%p1%dD"", ...},
     ...}
 ```
+
+Some properties
+---------------
+* For boolean capabilities, only those that are set are included
+  in the map. That is, the map never contains any associations on
+  the form `capability_name() => false`.
+
+* The terminfo capability names are known to not be compatible with
+  HP-UX, AIX, and OSF/1, as mentioned on the
+  [term(5)](https://man7.org/linux/man-pages/man5/term.5.html) and
+  [terminfo(5)](https://man7.org/linux/man-pages/man5/terminfo.5.html)
+  man pages.
 
 Version numbering
 -----------------
